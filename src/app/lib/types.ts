@@ -10,6 +10,7 @@ export interface Hospital {
   apiKey: string;
   carrierApiKey?: string;
   carrier?: 'KT' | 'STB' | 'LG';
+  senderNumber?: string; // 솔라피 발신번호 (e.g. "01012345678")
 
   // Call Ended
   callEndedMessage?: string;

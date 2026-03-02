@@ -176,7 +176,7 @@ export const PatientRegistrationForm: React.FC<PatientRegistrationFormProps> = (
                         {errors.purpose && <p style={errStyle}>{errors.purpose}</p>}
                     </div>
                     <div style={{ marginBottom: errors.privacy ? 8 : 32 }}>
-                        <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', cursor: 'pointer' }}>
                             <input
                                 type="checkbox"
                                 checked={privacyChecked}
@@ -184,12 +184,22 @@ export const PatientRegistrationForm: React.FC<PatientRegistrationFormProps> = (
                                     setPrivacyChecked(e.target.checked);
                                     if (e.target.checked) setErrors(err => ({ ...err, privacy: '' }));
                                 }}
-                                style={{ margin: 0, marginRight: 8, width: 16, height: 16, cursor: 'pointer' }}
+                                style={{ margin: 0, marginRight: 8, width: 16, height: 16, cursor: 'pointer', marginTop: 2, flexShrink: 0 }}
                             />
                             <span style={{ fontSize: 13, color: '#333', fontWeight: 500 }}>
-                                [v] 개인정보 수집 및 이용, 마케팅 활용에 동의합니다
+                                개인정보 수집 및 이용, 마케팅 활용에 동의합니다
                             </span>
                         </label>
+                        {hospital.landingLink && (
+                            <a
+                                href={hospital.landingLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ display: 'inline-block', marginTop: 6, marginLeft: 24, fontSize: 12, color: '#0070f3', textDecoration: 'underline' }}
+                            >
+                                병원 홈페이지 바로가기 →
+                            </a>
+                        )}
                         {errors.privacy && <p style={{ ...errStyle, marginTop: 8 }}>{errors.privacy}</p>}
                     </div>
 

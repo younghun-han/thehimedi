@@ -10,6 +10,7 @@ import { LoginPage } from './components/LoginPage';
 import { PatientList } from './components/PatientList';
 import { PatientRegistrationForm } from './components/PatientRegistrationForm';
 import { db } from './lib/db';
+import { sendMessages as solapiSendMessages } from './lib/solapi';
 import { useAuth } from './lib/useAuth';
 import { Hospital, CallLog, MessageTemplate } from './lib/types';
 import './index.css';
@@ -19,6 +20,8 @@ export default function App() {
   // URL param check (computed before hooks for reference, but rendered after hooks)
   const urlParams = new URLSearchParams(window.location.search);
   const registerCode = urlParams.get('register');
+  const trackLogId = urlParams.get('track');
+  const trackDest = urlParams.get('dest');
 
   const { user, isLoading: authLoading, login, logout } = useAuth();
   const [currentView, setCurrentView] = useState('dashboard');
@@ -33,6 +36,25 @@ export default function App() {
   // If this is a patient registration URL, show the form directly
   if (registerCode) {
     return <PatientRegistrationForm hospitalCode={registerCode} />;
+  }
+
+  // Landing page tracking redirect: use useEffect for side effects
+  useEffect(() => {
+    if (trackLogId && trackDest) {
+      db.incrementLandingVisits(trackLogId).catch(console.error);
+      const dest = decodeURIComponent(trackDest);
+      window.location.replace(dest);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // If this is a landing page tracking redirect, show redirect screen
+  if (trackLogId && trackDest) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#fff', fontFamily: 'sans-serif' }}>
+        <p style={{ color: '#888' }}>이동 중...</p>
+      </div>
+    );
   }
 
   // Load initial data
@@ -172,27 +194,77 @@ export default function App() {
     ? hospitals.find(h => h.id === activeHospitalId)
     : null;
 
+  // Build a tracking URL for a log: clicking it increments landing_visits then redirects to the real landingLink
+  const buildTrackingUrl = (logId: string, destUrl: string) => {
+    const base = window.location.origin + window.location.pathname;
+    return `${base}?track=${encodeURIComponent(logId)}&dest=${encodeURIComponent(destUrl)}`;
+  };
+
+  // Replace #{홈페이지} variable in message with tracking link if landingLink exists
+  const resolveMessageWithTracking = (rawMessage: string, hospital: Hospital, logId: string) => {
+    if (!rawMessage.includes('#{홈페이지}') || !hospital.landingLink) return rawMessage;
+    const trackingUrl = buildTrackingUrl(logId, hospital.landingLink);
+    return rawMessage.replace(/#{홈페이지}/g, trackingUrl);
+  };
+
   const handleManualBroadcast = async (hospitalId: string, message: string, targetNumbers: string[]) => {
     try {
       const timestamp = new Date().toISOString();
       const hospital = hospitals.find(h => h.id === hospitalId);
-      const senderNumber = hospital?.code || 'SYSTEM';
+      const fromNumber = hospital?.senderNumber || '';
 
-      const newLogs: CallLog[] = targetNumbers.map((targetNumber, idx) => ({
-        id: `m_${Date.now()}_${idx}`,
+      if (!fromNumber) {
+        toast.warning('발신번호가 설정되지 않았습니다. 병원 추가 설정에서 발신번호를 입력해주세요.');
+      }
+
+      // 로그 ID 미리 생성 (랜딩 트래킹용)
+      const logEntries = targetNumbers.map((targetNumber, idx) => {
+        const logId = `m_${Date.now()}_${idx}`;
+        const resolvedMessage = hospital
+          ? resolveMessageWithTracking(message, hospital, logId)
+          : message;
+        return { logId, targetNumber, resolvedMessage };
+      });
+
+      // 솔라피 실제 발송
+      let sendResults: Array<{ success: boolean }> = logEntries.map(() => ({ success: false }));
+      if (fromNumber) {
+        try {
+          const solapiMessages = logEntries.map(entry => ({
+            to: entry.targetNumber,
+            from: fromNumber,
+            text: entry.resolvedMessage,
+          }));
+          const result = await solapiSendMessages(solapiMessages);
+          sendResults = result.results;
+          if (result.failCount > 0) {
+            toast.warning(`${result.successCount}건 성공, ${result.failCount}건 실패`);
+          }
+        } catch (solapiError: any) {
+          toast.error(`SMS 발송 실패: ${solapiError.message}`);
+        }
+      }
+
+      // DB 로그 저장
+      const newLogs: CallLog[] = logEntries.map((entry, idx) => ({
+        id: entry.logId,
         hospitalId,
         timestamp,
-        callerNumber: senderNumber,
-        receiverNumber: targetNumber,
-        status: Math.random() > 0.05 ? 'Success' : 'Failed',
-        content: message,
+        callerNumber: fromNumber || hospital?.code || 'SYSTEM',
+        receiverNumber: entry.targetNumber,
+        status: sendResults[idx]?.success ? 'Success' : 'Failed',
+        content: entry.resolvedMessage,
         landingVisits: 0,
         triggerType: 'manual'
-      }));
+      } as CallLog));
 
       const createdLogs = await Promise.all(newLogs.map(log => db.createLog(log)));
       setLogs(prev => [...createdLogs, ...prev]);
-      toast.success(`${targetNumbers.length}명에게 메시지 발송을 완료했습니다.`);
+      if (fromNumber) {
+        toast.success(`${targetNumbers.length}명에게 메시지 발송 완료`);
+      } else {
+        toast.success(`${targetNumbers.length}건 로그 저장 완료 (발신번호 미설정으로 실발송 없음)`);
+      }
     } catch (error) {
       console.error('Manual broadcast failed:', error);
       toast.error('메시지 일괄 발송에 실패했습니다.');

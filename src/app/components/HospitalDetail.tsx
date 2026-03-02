@@ -422,6 +422,25 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
                 <LinkIcon size={16} className="mr-2" />
                 추가 설정
               </h3>
+
+              <div className="mb-6">
+                <FormGroup label="SMS 발신번호 (솔라피 등록 번호)">
+                  <div className="relative">
+                    <Phone size={18} className="absolute left-3 top-3 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.senderNumber || ''}
+                      onChange={(e) => handleChange('senderNumber', e.target.value)}
+                      placeholder="01012345678 (하이픈 없이)"
+                      className="w-full bg-[#383838] border border-[#4A4A4A] rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none focus:border-[#00E2E3] transition-colors font-mono text-sm placeholder-gray-600"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    * 솔라피 콘솔에 등록된 발신번호를 입력하세요. 미입력 시 실제 발송이 되지 않습니다.
+                  </p>
+                </FormGroup>
+              </div>
+
               <FormGroup label="랜딩 페이지 링크">
                 <div className="relative">
                   <LinkIcon size={18} className="absolute left-3 top-3 text-gray-400" />

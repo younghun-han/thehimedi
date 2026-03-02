@@ -15,6 +15,7 @@ function rowToHospital(row: any): Hospital {
     landingLink: row.landing_link ?? '',
     apiKey: row.api_key ?? '',
     carrierApiKey: row.carrier_api_key ?? '',
+    senderNumber: row.sender_number ?? '',
     enableCallEnded: row.enable_call_ended ?? false,
     callEndedMessage: row.call_ended_message ?? '',
     manualMessage: row.manual_message ?? '',
@@ -33,6 +34,7 @@ function hospitalToRow(h: Hospital) {
     landing_link: h.landingLink,
     api_key: h.apiKey,
     carrier_api_key: h.carrierApiKey,
+    sender_number: h.senderNumber ?? '',
     enable_call_ended: h.enableCallEnded,
     call_ended_message: h.callEndedMessage,
     manual_message: h.manualMessage,
@@ -370,6 +372,27 @@ class SupabaseDB {
       .single();
     if (error) throw new Error(error.message);
     return rowToRegistration(data);
+  }
+
+  async incrementLandingVisits(logId: string): Promise<void> {
+    // Increment the landing_visits counter and update last_landing_visit timestamp
+    const { error } = await supabase.rpc('increment_landing_visits', { log_id: logId });
+    if (error) {
+      // Fallback: manual increment if RPC not available
+      const { data: current } = await supabase
+        .from('call_logs')
+        .select('landing_visits')
+        .eq('id', logId)
+        .single();
+      const currentVisits = current?.landing_visits ?? 0;
+      await supabase
+        .from('call_logs')
+        .update({
+          landing_visits: currentVisits + 1,
+          last_landing_visit: new Date().toISOString(),
+        })
+        .eq('id', logId);
+    }
   }
 }
 
