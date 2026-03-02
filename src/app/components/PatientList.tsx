@@ -2,7 +2,8 @@ import React, { useState, useMemo, useRef } from 'react';
 import {
     Search, Filter, User, Phone, Building, CheckCircle, XCircle,
     Calendar, MousePointerClick, Clock, MessageSquare, X,
-    ArrowLeft, ArrowDownLeft, PhoneMissed, PhoneOff, Send, Copy, UploadCloud, Download, Plus, PhoneIncoming, PhoneCall
+    ArrowLeft, ArrowDownLeft, PhoneMissed, PhoneOff, Send, Copy, UploadCloud, Download, Plus, PhoneIncoming, PhoneCall,
+    Trash2, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CallLog, Hospital, PatientRegistration, AuthUser } from '../lib/types';
@@ -17,6 +18,8 @@ interface PatientListProps {
     registrations: PatientRegistration[];
     user: AuthUser;
     onAddRegistrations: (regs: PatientRegistration[]) => void;
+    onDeleteRegistrations?: (phoneNumber: string, hospitalId?: string) => Promise<void>;
+    onDeleteAllRegistrations?: (hospitalId?: string) => Promise<void>;
 }
 
 interface PatientSummary {
@@ -41,7 +44,7 @@ const TRIGGER_LABELS: Record<string, { label: string; icon: React.ReactNode; col
     skb_completed: { label: '통화완료 (SKB)', icon: <PhoneCall size={12} className="mr-1" />, color: 'text-green-400 bg-green-900/20 border-green-800/50' },
 };
 
-export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, registrations, user, onAddRegistrations }) => {
+export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, registrations, user, onAddRegistrations, onDeleteRegistrations, onDeleteAllRegistrations }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [hospitalFilter, setHospitalFilter] = useState<string>('All');
     const [selectedPatient, setSelectedPatient] = useState<PatientSummary | null>(null);
@@ -49,6 +52,8 @@ export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, regis
     const [isUploading, setIsUploading] = useState(false);
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'single'; patient: PatientSummary } | { type: 'all' } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     const getHospitalName = (id: string) => hospitals.find(h => h.id === id)?.name ?? 'Unknown';
@@ -60,6 +65,32 @@ export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, regis
         e.stopPropagation();
         navigator.clipboard.writeText(purpose);
         toast.success('접수 목적이 복사되었습니다.');
+    };
+
+    const effectiveHospitalId = user.role === 'user'
+        ? user.hospitalId
+        : hospitalFilter !== 'All' ? hospitalFilter : undefined;
+
+    const handleDeleteSingle = async () => {
+        if (deleteConfirm?.type !== 'single') return;
+        setIsDeleting(true);
+        try {
+            await onDeleteRegistrations?.(deleteConfirm.patient.phoneNumber, effectiveHospitalId);
+        } finally {
+            setIsDeleting(false);
+            setDeleteConfirm(null);
+        }
+    };
+
+    const handleDeleteAll = async () => {
+        if (deleteConfirm?.type !== 'all') return;
+        setIsDeleting(true);
+        try {
+            await onDeleteAllRegistrations?.(effectiveHospitalId);
+        } finally {
+            setIsDeleting(false);
+            setDeleteConfirm(null);
+        }
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,21 +202,11 @@ export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, regis
             if (new Date(reg.submittedAt) > new Date(p.lastContact)) p.lastContact = reg.submittedAt;
         });
 
-        // 2. call_logs 병합
+        // 2. call_logs 병합 (등록소에 있는 환자들 정보에만 병합, 미등록 번호는 환자 관리 목록에 안 보임)
         logs.forEach(log => {
             const phone = getCustomerNumber(log) || '알 수 없음';
-            if (!map.has(phone)) {
-                map.set(phone, {
-                    phoneNumber: phone,
-                    hospitalIds: [],
-                    totalLogs: 0,
-                    successCount: 0,
-                    failedCount: 0,
-                    lastContact: log.timestamp,
-                    totalLandingVisits: 0,
-                    logs: [],
-                });
-            }
+            if (!map.has(phone)) return; // <-- Only add logs to existing patient registrations
+
             const p = map.get(phone)!;
             p.totalLogs += 1;
             if (log.status === 'Success') p.successCount += 1;
@@ -359,7 +380,7 @@ export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, regis
                     <p className="text-gray-400 mt-1">전화번호 기준으로 환자별 SMS 이력을 확인합니다</p>
                 </div>
                 <div className="flex items-center space-x-3">
-                    {hospitals.length > 1 && (
+                    {user.role === 'master' && (
                         <div className="flex items-center bg-[#2A2A2A] border border-[#383838] rounded-lg px-2">
                             <Building size={16} className="text-gray-400 ml-2" />
                             <select
@@ -426,13 +447,21 @@ export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, regis
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-[#252525] border-b border-[#333]">
+                                {user.role === 'master' && <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">병원명</th>}
                                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">이름 (전화번호)</th>
-                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">접수 목적</th>
-                                {hospitals.length > 1 && <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">연관 병원</th>}
                                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">총 발송</th>
                                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">성공 / 실패</th>
                                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">랜딩방문</th>
                                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">최근 연락</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider w-16 text-center">
+                                    <button
+                                        onClick={() => setDeleteConfirm({ type: 'all' })}
+                                        className="text-red-400 hover:text-red-300 transition-colors flex items-center justify-center w-full"
+                                        title="전체 삭제"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#2A2A2A]">
@@ -445,6 +474,20 @@ export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, regis
                                     onClick={() => setSelectedPatient(patient)}
                                     className="hover:bg-[#2A2A2A] cursor-pointer transition-colors group"
                                 >
+                                    {user.role === 'master' && (
+                                        <td className="px-6 py-4 text-sm text-[#00E2E3]">
+                                            {patient.hospitalIds.length > 0 ? (
+                                                <div className="flex flex-col gap-1">
+                                                    {Array.from(new Set(patient.hospitalIds)).map(hid => (
+                                                        <span key={hid} className="flex items-center">
+                                                            <Building size={12} className="mr-1 opacity-70" />
+                                                            {getHospitalName(hid)}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : <span className="text-gray-600">-</span>}
+                                        </td>
+                                    )}
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2">
@@ -455,28 +498,6 @@ export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, regis
                                             <span className="text-xs font-mono text-gray-500">{patient.phoneNumber}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        {patient.purpose && (
-                                            <div className="flex items-center mt-1 group/purpose">
-                                                <span className="text-xs text-gray-500 truncate max-w-[150px]" title={patient.purpose}>
-                                                    {patient.purpose}
-                                                </span>
-                                                <button
-                                                    onClick={(e) => handleCopyPurpose(patient.purpose!, e)}
-                                                    className="ml-1.5 text-gray-500 hover:text-[#00E2E3] opacity-0 group-hover/purpose:opacity-100 transition-all p-1 rounded hover:bg-[#2A2A2A]"
-                                                    title="목적 복사"
-                                                >
-                                                    <Copy size={12} />
-                                                </button>
-                                            </div>
-                                        )}
-                                        {!patient.purpose && <span className="text-gray-600">-</span>}
-                                    </td>
-                                    {hospitals.length > 1 && (
-                                        <td className="px-6 py-4 text-sm text-gray-300">
-                                            {Array.from(new Set(patient.hospitalIds)).map(id => getHospitalName(id)).join(', ')}
-                                        </td>
-                                    )}
                                     <td className="px-6 py-4 text-center">
                                         <span className="text-white font-bold font-mono">{patient.totalLogs}</span>
                                         <span className="text-gray-500 text-xs ml-1">건</span>
@@ -508,6 +529,15 @@ export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, regis
                                             {format(new Date(patient.lastContact), 'yyyy-MM-dd HH:mm')}
                                         </div>
                                     </td>
+                                    <td className="px-3 py-4 text-center">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ type: 'single', patient }); }}
+                                            className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-red-900/20 transition-all"
+                                            title="삭제"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </td>
                                 </motion.tr>
                             ))}
                         </tbody>
@@ -519,6 +549,76 @@ export const PatientList: React.FC<PatientListProps> = ({ logs, hospitals, regis
                     )}
                 </div>
             </div>
+
+            {/* Delete Confirm Modal */}
+            <AnimatePresence>
+                {deleteConfirm && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => !isDeleting && setDeleteConfirm(null)}
+                            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="relative bg-[#1E1E1E] w-full max-w-md rounded-2xl border border-[#333] shadow-2xl overflow-hidden"
+                        >
+                            <div className="flex items-center gap-3 px-6 py-5 border-b border-[#2A2A2A]">
+                                <div className="flex items-center justify-center w-9 h-9 rounded-full bg-red-900/30 border border-red-800/50">
+                                    <AlertTriangle size={18} className="text-red-400" />
+                                </div>
+                                <h3 className="text-base font-bold text-white">
+                                    {deleteConfirm.type === 'all' ? '전체 환자 삭제' : '환자 삭제'}
+                                </h3>
+                            </div>
+                            <div className="px-6 py-5">
+                                {deleteConfirm.type === 'single' ? (
+                                    <p className="text-gray-300 text-sm leading-relaxed">
+                                        <span className="text-white font-semibold">
+                                            {deleteConfirm.patient.name ?? deleteConfirm.patient.phoneNumber}
+                                        </span>
+                                        {deleteConfirm.patient.name && (
+                                            <span className="text-gray-400"> ({deleteConfirm.patient.phoneNumber})</span>
+                                        )}
+                                        의 접수 데이터를 삭제합니다.<br />
+                                        <span className="text-gray-500 text-xs mt-1 block">통화 로그는 유지됩니다.</span>
+                                    </p>
+                                ) : (
+                                    <p className="text-gray-300 text-sm leading-relaxed">
+                                        현재 필터 기준의 <span className="text-red-400 font-semibold">모든 환자 접수 데이터</span>를 삭제합니다.<br />
+                                        <span className="text-gray-500 text-xs mt-1 block">이 작업은 되돌릴 수 없습니다.</span>
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#2A2A2A]">
+                                <button
+                                    onClick={() => setDeleteConfirm(null)}
+                                    disabled={isDeleting}
+                                    className="px-4 py-2 text-sm text-gray-400 hover:text-white bg-[#252525] hover:bg-[#2A2A2A] border border-[#383838] rounded-lg transition-colors"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    onClick={deleteConfirm.type === 'single' ? handleDeleteSingle : handleDeleteAll}
+                                    disabled={isDeleting}
+                                    className="flex items-center px-4 py-2 text-sm text-white bg-red-700 hover:bg-red-600 rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    {isDeleting ? (
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                    ) : (
+                                        <Trash2 size={14} className="mr-2" />
+                                    )}
+                                    삭제
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Upload Excel Modal */}
             {showUploadModal && (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layout } from './components/Layout';
 import { HospitalList } from './components/HospitalList';
 import { HospitalDetail } from './components/HospitalDetail';
@@ -39,14 +39,27 @@ export default function App() {
   }
 
   // Landing page tracking redirect: use useEffect for side effects
+  const trackingDone = useRef(false);
   useEffect(() => {
-    if (trackLogId && trackDest) {
-      db.incrementLandingVisits(trackLogId).catch(console.error);
-      const dest = decodeURIComponent(trackDest);
-      window.location.replace(dest);
+    if (trackLogId && trackDest && !trackingDone.current) {
+      trackingDone.current = true;
+      const processTracking = async () => {
+        try {
+          // Wait for the tracking request to finish before redirecting (prevents browser cancellation)
+          await db.incrementLandingVisits(trackLogId);
+        } catch (error) {
+          console.error(error);
+        } finally {
+          let dest = decodeURIComponent(trackDest);
+          if (!dest.startsWith('http://') && !dest.startsWith('https://')) {
+            dest = 'https://' + dest;
+          }
+          window.location.replace(dest);
+        }
+      };
+      processTracking();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [trackLogId, trackDest]);
 
   // If this is a landing page tracking redirect, show redirect screen
   if (trackLogId && trackDest) {
@@ -196,38 +209,55 @@ export default function App() {
 
   // Build a tracking URL for a log: clicking it increments landing_visits then redirects to the real landingLink
   const buildTrackingUrl = (logId: string, destUrl: string) => {
-    const base = window.location.origin + window.location.pathname;
-    return `${base}?track=${encodeURIComponent(logId)}&dest=${encodeURIComponent(destUrl)}`;
+    const base = window.location.origin;
+    return `${base}/?track=${encodeURIComponent(logId)}&dest=${encodeURIComponent(destUrl)}`;
   };
 
-  // Replace #{홈페이지} variable in message with tracking link if landingLink exists
-  const resolveMessageWithTracking = (rawMessage: string, hospital: Hospital, logId: string) => {
-    if (!rawMessage.includes('#{홈페이지}') || !hospital.landingLink) return rawMessage;
-    const trackingUrl = buildTrackingUrl(logId, hospital.landingLink);
-    return rawMessage.replace(/#{홈페이지}/g, trackingUrl);
+  // Replace variables in message with actual data and append tracking link
+  const resolveMessageWithTracking = (rawMessage: string, hospital: Hospital, logId: string, receiverNumber?: string) => {
+    let resolved = rawMessage;
+
+    // 1. Hospital Name
+    resolved = resolved.replace(/#{병원명}/g, hospital.name).replace(/{병원명}/g, hospital.name);
+
+    // 2. Customer Name (lookup from registrations if possible)
+    if (resolved.includes('고객명')) {
+      const patientName = registrations.find(r => r.phone === receiverNumber)?.name || '고객님';
+      resolved = resolved.replace(/#{고객명}/g, patientName).replace(/{고객명}/g, patientName);
+    }
+
+    // 3. Automatic Landing Page URL (Always append to the bottom if exists)
+    if (hospital.landingLink) {
+      const trackingUrl = buildTrackingUrl(logId, hospital.landingLink);
+      // Remove any existing manual {홈페이지} variables to avoid confusion
+      resolved = resolved.replace(/#{홈페이지}/g, '').replace(/{홈페이지}/g, '');
+      resolved = resolved.trim() + "\n\n" + trackingUrl;
+    }
+
+    return resolved;
   };
 
-  const handleManualBroadcast = async (hospitalId: string, message: string, targetNumbers: string[]) => {
+  const handleManualBroadcast = async (hospitalId: string, message: string, targetNumbers: string[], fromNumber: string) => {
     try {
       const timestamp = new Date().toISOString();
       const hospital = hospitals.find(h => h.id === hospitalId);
-      const fromNumber = hospital?.senderNumber || '';
+      // fromNumber is passed directly from HospitalDetail's formData (live, unsaved value)
 
       if (!fromNumber) {
         toast.warning('발신번호가 설정되지 않았습니다. 병원 추가 설정에서 발신번호를 입력해주세요.');
       }
 
-      // 로그 ID 미리 생성 (랜딩 트래킹용)
+      // 로그 ID 미리 생성 (랜딩 트래킹용) - Must be a valid UUID to match DB schema safely
       const logEntries = targetNumbers.map((targetNumber, idx) => {
-        const logId = `m_${Date.now()}_${idx}`;
+        const logId = crypto.randomUUID();
         const resolvedMessage = hospital
-          ? resolveMessageWithTracking(message, hospital, logId)
+          ? resolveMessageWithTracking(message, hospital, logId, targetNumber)
           : message;
         return { logId, targetNumber, resolvedMessage };
       });
 
       // 솔라피 실제 발송
-      let sendResults: Array<{ success: boolean }> = logEntries.map(() => ({ success: false }));
+      let sendResults: Array<{ success: boolean; error?: string }> = logEntries.map(() => ({ success: false }));
       if (fromNumber) {
         try {
           const solapiMessages = logEntries.map(entry => ({
@@ -242,6 +272,7 @@ export default function App() {
           }
         } catch (solapiError: any) {
           toast.error(`SMS 발송 실패: ${solapiError.message}`);
+          sendResults = sendResults.map(r => ({ ...r, error: solapiError.message }));
         }
       }
 
@@ -253,6 +284,7 @@ export default function App() {
         callerNumber: fromNumber || hospital?.code || 'SYSTEM',
         receiverNumber: entry.targetNumber,
         status: sendResults[idx]?.success ? 'Success' : 'Failed',
+        errorMessage: sendResults[idx]?.error || undefined,
         content: entry.resolvedMessage,
         landingVisits: 0,
         triggerType: 'manual'
@@ -268,6 +300,31 @@ export default function App() {
     } catch (error) {
       console.error('Manual broadcast failed:', error);
       toast.error('메시지 일괄 발송에 실패했습니다.');
+    }
+  };
+
+  const handleDeleteRegistrations = async (phone: string, hospitalId?: string) => {
+    try {
+      await db.deleteRegistrationsByPhone(phone, hospitalId);
+      // Refresh registrations
+      const loadedRegs = await db.getRegistrations(user?.role === 'user' ? user.hospitalId : undefined);
+      setRegistrations(loadedRegs);
+
+      toast.success('환자 정보가 삭제되었습니다. (관련 발송 이력은 로그 기록에 유지됩니다.)');
+    } catch (error) {
+      console.error('Delete registrations failed:', error);
+      toast.error('삭제에 실패했습니다.');
+    }
+  };
+
+  const handleDeleteAllRegistrations = async (hospitalId?: string) => {
+    try {
+      await db.deleteAllRegistrations(hospitalId);
+      setRegistrations(prev => hospitalId ? prev.filter(r => r.hospitalId !== hospitalId) : []);
+      toast.success('모든 환자 정보가 삭제되었습니다.');
+    } catch (error) {
+      console.error('Delete all registrations failed:', error);
+      toast.error('전체 삭제에 실패했습니다.');
     }
   };
 
@@ -335,6 +392,16 @@ export default function App() {
           registrations={registrations}
           user={user}
           onAddRegistrations={(newRegs) => setRegistrations(prev => [...newRegs, ...prev])}
+          onDeleteRegistrations={async (phoneNumber, hospitalId) => {
+            await db.deleteRegistrationsByPhone(phoneNumber, hospitalId);
+            setRegistrations(prev => prev.filter(r => r.phone !== phoneNumber || (hospitalId && r.hospitalId !== hospitalId)));
+            toast.success('환자 정보가 삭제되었습니다.');
+          }}
+          onDeleteAllRegistrations={async (hospitalId) => {
+            await db.deleteAllRegistrations(hospitalId);
+            setRegistrations(prev => hospitalId ? prev.filter(r => r.hospitalId !== hospitalId) : []);
+            toast.success('모든 환자 정보가 삭제되었습니다.');
+          }}
         />
       )}
 

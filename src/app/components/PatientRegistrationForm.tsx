@@ -45,12 +45,10 @@ export const PatientRegistrationForm: React.FC<PatientRegistrationFormProps> = (
         if (!validate() || !hospital) return;
         setIsLoading(true);
         await db.createRegistration({
-            id: `reg_${Date.now()}`,
             hospitalId: hospital.id,
             name: form.name.trim(),
             phone: getFullPhone(),
             purpose: form.purpose.trim(),
-            submittedAt: new Date().toISOString(),
         });
         setIsLoading(false);
         setSubmitted(true);
@@ -190,16 +188,7 @@ export const PatientRegistrationForm: React.FC<PatientRegistrationFormProps> = (
                                 개인정보 수집 및 이용, 마케팅 활용에 동의합니다
                             </span>
                         </label>
-                        {hospital.landingLink && (
-                            <a
-                                href={hospital.landingLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ display: 'inline-block', marginTop: 6, marginLeft: 24, fontSize: 12, color: '#0070f3', textDecoration: 'underline' }}
-                            >
-                                병원 홈페이지 바로가기 →
-                            </a>
-                        )}
+
                         {errors.privacy && <p style={{ ...errStyle, marginTop: 8 }}>{errors.privacy}</p>}
                     </div>
 

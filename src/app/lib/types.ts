@@ -42,6 +42,7 @@ export interface CallLog {
   startedAt?: string;
   endedAt?: string;
   durationSec?: number;
+  errorMessage?: string;
 }
 
 export interface MessageTemplate {

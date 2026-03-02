@@ -13,33 +13,31 @@ interface MessageTemplateEditorProps {
 
 const VARIABLES: Record<TemplateType, { key: string; label: string; desc: string }[]> = {
   missed: [
-    { key: '#{고객명}', label: '고객명', desc: '전화 건 사람의 이름 (저장된 경우)' },
-    { key: '#{병원명}', label: '병원명', desc: '설정된 병원 이름' },
-    { key: '#{홈페이지}', label: '홈페이지', desc: '랜딩 페이지 링크' },
+    { key: '{고객명}', label: '고객명', desc: '전화 건 사람의 이름 (저장된 경우)' },
+    { key: '{병원명}', label: '병원명', desc: '설정된 병원 이름' },
   ],
   callEnded: [
-    { key: '#{고객명}', label: '고객명', desc: '통화 상대방 이름' },
-    { key: '#{병원명}', label: '병원명', desc: '설정된 병원 이름' },
-    { key: '#{홈페이지}', label: '홈페이지', desc: '랜딩 페이지 링크' },
-    { key: '#{예약링크}', label: '예약링크', desc: '온라인 예약 페이지' },
+    { key: '{고객명}', label: '고객명', desc: '통화 상대방 이름' },
+    { key: '{병원명}', label: '병원명', desc: '설정된 병원 이름' },
+    { key: '{예약링크}', label: '예약링크', desc: '온라인 예약 페이지' },
   ],
   review: [
-    { key: '#{고객명}', label: '고객명', desc: '방문 고객 이름' },
-    { key: '#{병원명}', label: '병원명', desc: '설정된 병원 이름' },
-    { key: '#{리뷰링크}', label: '리뷰링크', desc: '리뷰 작성 페이지 링크' },
-    { key: '#{진료일}', label: '진료일', desc: '진료 받은 날짜' },
+    { key: '{고객명}', label: '고객명', desc: '방문 고객 이름' },
+    { key: '{병원명}', label: '병원명', desc: '설정된 병원 이름' },
+    { key: '{리뷰링크}', label: '리뷰링크', desc: '리뷰 작성 페이지 링크' },
+    { key: '{진료일}', label: '진료일', desc: '진료 받은 날짜' },
   ],
   reservation: [
-    { key: '#{고객명}', label: '고객명', desc: '예약자 이름' },
-    { key: '#{병원명}', label: '병원명', desc: '설정된 병원 이름' },
-    { key: '#{예약일시}', label: '예약일시', desc: '확정된 예약 날짜 및 시간' },
-    { key: '#{담당의}', label: '담당의', desc: '예약된 담당 의사' },
+    { key: '{고객명}', label: '고객명', desc: '예약자 이름' },
+    { key: '{병원명}', label: '병원명', desc: '설정된 병원 이름' },
+    { key: '{예약일시}', label: '예약일시', desc: '확정된 예약 날짜 및 시간' },
+    { key: '{담당의}', label: '담당의', desc: '예약된 담당 의사' },
   ],
 };
 
-export const MessageTemplateEditor: React.FC<MessageTemplateEditorProps> = ({ 
-  value, 
-  onChange, 
+export const MessageTemplateEditor: React.FC<MessageTemplateEditorProps> = ({
+  value,
+  onChange,
   type,
   placeholder,
   hideVariables = false
@@ -47,13 +45,13 @@ export const MessageTemplateEditor: React.FC<MessageTemplateEditorProps> = ({
   const insertVariable = (variableKey: string) => {
     // Simple append for now, could be improved to insert at cursor position
     const textarea = document.getElementById(`template-editor-${type}`) as HTMLTextAreaElement;
-    
+
     if (textarea) {
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
       const newValue = value.substring(0, start) + variableKey + value.substring(end);
       onChange(newValue);
-      
+
       // Restore cursor position after update (needs setTimeout to wait for render)
       setTimeout(() => {
         textarea.focus();

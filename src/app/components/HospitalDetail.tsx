@@ -18,7 +18,7 @@ interface HospitalDetailProps {
   onDelete?: (id: string) => void;
   onResetPassword?: (hospitalId: string, hospitalCode: string) => Promise<void>;
   onNavigateToLogs: (hospitalId: string) => void;
-  onManualBroadcast: (hospitalId: string, message: string, targetNumbers: string[]) => Promise<void>;
+  onManualBroadcast: (hospitalId: string, message: string, targetNumbers: string[], fromNumber: string) => Promise<void>;
 }
 
 export const HospitalDetail: React.FC<HospitalDetailProps> = ({
@@ -115,7 +115,7 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
   const executeManualSend = async () => {
     if (!formData.manualMessage) return;
     setIsSending(true);
-    await onManualBroadcast(hospital.id, formData.manualMessage, uniqueTargets);
+    await onManualBroadcast(hospital.id, formData.manualMessage, uniqueTargets, formData.senderNumber || '');
     setIsSending(false);
   };
 

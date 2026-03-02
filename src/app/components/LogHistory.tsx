@@ -191,8 +191,8 @@ export const LogHistory: React.FC<LogHistoryProps> = ({ logs, hospitals, initial
                   <td className="px-6 py-4 text-sm">
                     {log.type === 'skb_call' ? (
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${log.status === 'Incoming' ? 'bg-blue-900/30 text-blue-400 border-blue-800' :
-                          log.status === 'Missed' ? 'bg-red-900/30 text-red-400 border-red-800' :
-                            'bg-green-900/30 text-green-400 border-green-800'
+                        log.status === 'Missed' ? 'bg-red-900/30 text-red-400 border-red-800' :
+                          'bg-green-900/30 text-green-400 border-green-800'
                         }`}>
                         {log.status === 'Incoming' && <PhoneIncoming size={12} className="mr-1" />}
                         {log.status === 'Missed' && <PhoneMissed size={12} className="mr-1" />}
@@ -201,9 +201,9 @@ export const LogHistory: React.FC<LogHistoryProps> = ({ logs, hospitals, initial
                       </span>
                     ) : (
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${log.status === 'Success'
-                          ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800'
-                          : 'bg-red-900/30 text-red-400 border-red-800'
-                        }`}>
+                        ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800'
+                        : 'bg-red-900/30 text-red-400 border-red-800'
+                        }`} title={log.errorMessage || '발송 실패'}>
                         {log.status === 'Success' ? <CheckCircle size={12} className="mr-1" /> : <XCircle size={12} className="mr-1" />}
                         {log.status === 'Success' ? '발송 성공' : '발송 실패'}
                       </span>
@@ -305,12 +305,19 @@ export const LogHistory: React.FC<LogHistoryProps> = ({ logs, hospitals, initial
 
                   <div className="bg-[#141414] p-4 rounded-xl border border-[#2A2A2A]">
                     <p className="text-xs text-gray-500 mb-1">상태</p>
-                    <div className="flex items-center">
-                      <span className={`inline-flex items-center text-sm font-medium ${selectedLog.status === 'Success' ? 'text-green-400' : 'text-red-400'
-                        }`}>
-                        {selectedLog.status === 'Success' ? <CheckCircle size={16} className="mr-2" /> : <XCircle size={16} className="mr-2" />}
-                        {selectedLog.status === 'Success' ? '발송 성공' : '발송 실패'}
-                      </span>
+                    <div className="flex flex-col">
+                      <div className="flex items-center">
+                        <span className={`inline-flex items-center text-sm font-medium ${selectedLog.status === 'Success' ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                          {selectedLog.status === 'Success' ? <CheckCircle size={16} className="mr-2" /> : <XCircle size={16} className="mr-2" />}
+                          {selectedLog.status === 'Success' ? '발송 성공' : '발송 실패'}
+                        </span>
+                      </div>
+                      {selectedLog.status !== 'Success' && selectedLog.errorMessage && (
+                        <p className="text-xs text-red-400 mt-2 bg-red-500/10 p-2 rounded border border-red-500/20">
+                          {selectedLog.errorMessage}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
