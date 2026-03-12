@@ -360,9 +360,19 @@ export default function App() {
     }
   };
 
-  // ─── Supabase Realtime: call_logs 실시간 구독 ────────────────────────────────
+  // ─── Supabase Realtime + 30초 polling 병행 ───────────────────────────────────
   useEffect(() => {
     if (!user) return;
+
+    const applyLogs = (loadedLogs: CallLog[]) => {
+      if (user.role === 'user' && user.hospitalId) {
+        setLogs(loadedLogs.filter(l => l.hospitalId === user.hospitalId));
+      } else {
+        setLogs(loadedLogs);
+      }
+    };
+
+    // Realtime 구독 (즉시 반영)
     const channel = supabase
       .channel('call_logs_realtime')
       .on(
@@ -372,7 +382,7 @@ export default function App() {
           const row = payload.new;
           if (!row) return;
           if (user.role === 'user' && user.hospitalId && row.hospital_id !== user.hospitalId) return;
-          const newLog = {
+          const newLog: CallLog = {
             id: row.id,
             hospitalId: row.hospital_id,
             timestamp: row.timestamp,
@@ -383,7 +393,7 @@ export default function App() {
             landingVisits: row.landing_visits ?? 0,
             lastLandingVisit: row.last_landing_visit ?? undefined,
             triggerType: row.trigger_type ?? 'missed',
-            type: 'message' as const,
+            type: 'message',
             errorMessage: row.error_message,
           };
           setLogs(prev => {
@@ -393,7 +403,21 @@ export default function App() {
         }
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    // Polling fallback (30초마다 — Realtime 미지원 환경 대비)
+    const interval = setInterval(async () => {
+      try {
+        const loadedLogs = await db.getLogs();
+        applyLogs(loadedLogs);
+      } catch (err) {
+        console.error('로그 갱신 오류:', err);
+      }
+    }, 30_000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, [user]);
 
   // ─── LG 폴링 (60초마다) ───────────────────────────────────────────────────
