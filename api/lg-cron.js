@@ -36,10 +36,11 @@ async function sendSolapiSms(to, from, text) {
     }),
   });
   const data = await res.json();
-  const msgResult = data?.messages?.[0];
+  // send-many 응답은 group 객체 (messages 배열 없음)
+  const success = (data?.count?.registeredSuccess ?? 0) > 0;
   return {
-    success: msgResult?.statusCode === '2000',
-    error: msgResult?.statusCode !== '2000' ? msgResult?.statusMessage : undefined,
+    success,
+    error: !success ? (data?.log?.slice(-1)?.[0]?.message || JSON.stringify(data)) : undefined,
   };
 }
 
