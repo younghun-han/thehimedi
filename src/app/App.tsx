@@ -359,6 +359,25 @@ export default function App() {
     }
   };
 
+  // ─── 로그 자동 갱신 (60초마다) ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const refreshLogs = async () => {
+      try {
+        const loadedLogs = await db.getLogs();
+        if (user.role === 'user' && user.hospitalId) {
+          setLogs(loadedLogs.filter(l => l.hospitalId === user.hospitalId));
+        } else {
+          setLogs(loadedLogs);
+        }
+      } catch (err) {
+        console.error('로그 갱신 오류:', err);
+      }
+    };
+    const interval = setInterval(refreshLogs, 60_000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   // ─── LG 폴링 (60초마다) ───────────────────────────────────────────────────
 
   useEffect(() => {

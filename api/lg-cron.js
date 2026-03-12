@@ -123,15 +123,41 @@ export default async function handler(req, res) {
 
     const calls = lgData.DATAS;
 
-    // 첫 실행: 기존 통화 모두 기준선 처리 (SMS 미발송)
+    // 첫 실행: 미수신 통화 로그 기록 (SMS 미발송), 기준선 설정
     if (!lastCallTime) {
       const baseline = calls[0]?.TIME || new Date(Date.now() + 9 * 3600 * 1000)
         .toISOString().replace('T', ' ').slice(0, 19);
+
+      let baselineLogged = 0;
+      for (const call of calls) {
+        if (call.STATUS !== 'NO ANSWER' && call.STATUS !== 'CANCEL') continue;
+        const logId = crypto.randomUUID
+          ? crypto.randomUUID()
+          : Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const kstTime = call.TIME;
+        const utcTimestamp = new Date(
+          new Date(kstTime.replace(' ', 'T') + '+09:00').getTime()
+        ).toISOString();
+        await supabase.from('call_logs').insert({
+          id: logId,
+          hospital_id: hospital.id,
+          timestamp: utcTimestamp,
+          caller_number: call.SRC,
+          receiver_number: hospital.carrier_api_key || '',
+          status: 'Missed',
+          content: '',
+          landing_visits: 0,
+          trigger_type: 'missed',
+          error_message: null,
+        });
+        baselineLogged++;
+      }
+
       await supabase
         .from('hospitals')
         .update({ lg_last_call_time: baseline })
         .eq('id', hospital.id);
-      results.push({ hospital: hospital.name, message: '첫 실행: 기준선 설정', baseline });
+      results.push({ hospital: hospital.name, message: '첫 실행: 기준선 설정', baseline, baselineLogged });
       continue;
     }
 
