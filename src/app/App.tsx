@@ -10,6 +10,7 @@ import { LoginPage } from './components/LoginPage';
 import { PatientList } from './components/PatientList';
 import { PatientRegistrationForm } from './components/PatientRegistrationForm';
 import { db } from './lib/db';
+import { supabase } from './lib/supabase';
 import { sendMessages as solapiSendMessages } from './lib/solapi';
 import { getLGInboundCalls, isMissedCall, LGInboundCall } from './lib/lg-api';
 import { useAuth } from './lib/useAuth';
@@ -359,23 +360,40 @@ export default function App() {
     }
   };
 
-  // ─── 로그 자동 갱신 (60초마다) ──────────────────────────────────────────────
+  // ─── Supabase Realtime: call_logs 실시간 구독 ────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    const refreshLogs = async () => {
-      try {
-        const loadedLogs = await db.getLogs();
-        if (user.role === 'user' && user.hospitalId) {
-          setLogs(loadedLogs.filter(l => l.hospitalId === user.hospitalId));
-        } else {
-          setLogs(loadedLogs);
+    const channel = supabase
+      .channel('call_logs_realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'call_logs' },
+        (payload: any) => {
+          const row = payload.new;
+          if (!row) return;
+          if (user.role === 'user' && user.hospitalId && row.hospital_id !== user.hospitalId) return;
+          const newLog = {
+            id: row.id,
+            hospitalId: row.hospital_id,
+            timestamp: row.timestamp,
+            callerNumber: row.caller_number,
+            receiverNumber: row.receiver_number,
+            status: row.status as any,
+            content: row.content,
+            landingVisits: row.landing_visits ?? 0,
+            lastLandingVisit: row.last_landing_visit ?? undefined,
+            triggerType: row.trigger_type ?? 'missed',
+            type: 'message' as const,
+            errorMessage: row.error_message,
+          };
+          setLogs(prev => {
+            if (prev.some(l => l.id === newLog.id)) return prev;
+            return [newLog, ...prev];
+          });
         }
-      } catch (err) {
-        console.error('로그 갱신 오류:', err);
-      }
-    };
-    const interval = setInterval(refreshLogs, 60_000);
-    return () => clearInterval(interval);
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
   // ─── LG 폴링 (60초마다) ───────────────────────────────────────────────────
