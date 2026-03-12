@@ -1,0 +1,16 @@
+name: LG 미수신 자동 감지
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # 5분마다 실행
+  workflow_dispatch:         # 수동 실행 버튼
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: LG 미수신 폴링
+        run: |
+          curl -s -X POST https://thehimedi.vercel.app/api/lg-cron \
+            -H "Content-Type: application/json" \
+            --max-time 30
