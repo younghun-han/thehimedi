@@ -11,6 +11,7 @@ import { PatientList } from './components/PatientList';
 import { PatientRegistrationForm } from './components/PatientRegistrationForm';
 import { db } from './lib/db';
 import { sendMessages as solapiSendMessages } from './lib/solapi';
+import { getLGInboundCalls, isMissedCall, LGInboundCall } from './lib/lg-api';
 import { useAuth } from './lib/useAuth';
 import { Hospital, CallLog, MessageTemplate } from './lib/types';
 import './index.css';
@@ -32,6 +33,10 @@ export default function App() {
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // LG 폴링: 병원별 마지막 처리 통화 TIME 추적
+  const lgLastCallTimeRef = useRef<Map<string, string>>(new Map()); // hospitalId → last TIME
+  const lgProcessedChannelsRef = useRef<Set<string>>(new Set());    // 중복 처리 방지
 
   // If this is a patient registration URL, show the form directly
   if (registerCode) {
@@ -302,6 +307,117 @@ export default function App() {
       toast.error('메시지 일괄 발송에 실패했습니다.');
     }
   };
+
+  // ─── LG 미수신 처리 ──────────────────────────────────────────────────────────
+
+  const handleLGMissedCall = async (hospital: Hospital, call: LGInboundCall) => {
+    const callerNumber = call.SRC.replace(/-/g, '');
+    const timestamp = new Date().toISOString();
+    const logId = crypto.randomUUID();
+
+    const message = hospital.message || '';
+    const resolvedMessage = message
+      ? resolveMessageWithTracking(message, hospital, logId, callerNumber)
+      : '';
+
+    let success = false;
+    let errorMessage: string | undefined;
+
+    if (hospital.senderNumber && resolvedMessage) {
+      try {
+        const result = await solapiSendMessages([{
+          to: callerNumber,
+          from: hospital.senderNumber,
+          text: resolvedMessage,
+        }]);
+        success = result.results[0]?.success ?? false;
+        errorMessage = result.results[0]?.error;
+      } catch (err: any) {
+        errorMessage = err.message;
+      }
+    }
+
+    const newLog: CallLog = {
+      id: logId,
+      hospitalId: hospital.id,
+      timestamp,
+      callerNumber,
+      receiverNumber: hospital.carrierApiKey || '',
+      status: success ? 'Success' : (hospital.senderNumber && resolvedMessage ? 'Failed' : 'Missed'),
+      content: resolvedMessage,
+      landingVisits: 0,
+      triggerType: 'missed',
+      errorMessage,
+    };
+
+    try {
+      const created = await db.createLog(newLog);
+      setLogs(prev => [created, ...prev]);
+      if (success) toast.success(`${callerNumber} 미수신 SMS 자동 발송`);
+    } catch (err) {
+      console.error('LG 로그 저장 실패:', err);
+    }
+  };
+
+  // ─── LG 폴링 (60초마다) ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!user) return;
+
+    const lgHospitals = hospitals.filter(
+      h => h.carrier === 'LG' && h.carrierApiKey && h.carrierApiPass
+    );
+    if (lgHospitals.length === 0) return;
+
+    const pollOnce = async () => {
+      for (const hospital of lgHospitals) {
+        try {
+          const data = await getLGInboundCalls(hospital.carrierApiKey!, hospital.carrierApiPass!);
+
+          if (!data?.DATAS || !Array.isArray(data.DATAS)) continue;
+
+          const calls = data.DATAS as import('./lib/lg-api').LGInboundCall[];
+          const lastTime = lgLastCallTimeRef.current.get(hospital.id);
+          const isFirstPoll = !lastTime;
+
+          // 최신 통화 TIME 저장
+          if (calls.length > 0) {
+            lgLastCallTimeRef.current.set(hospital.id, calls[0].TIME);
+          }
+
+          // 첫 폴링: 기존 통화 기록만 저장 (SMS 미발송)
+          if (isFirstPoll) {
+            calls.forEach(c => lgProcessedChannelsRef.current.add(c.CHANNEL));
+            continue;
+          }
+
+          // 새 미수신 통화만 처리
+          for (const call of calls) {
+            if (lgProcessedChannelsRef.current.has(call.CHANNEL)) continue;
+            if (call.TIME <= lastTime!) {
+              lgProcessedChannelsRef.current.add(call.CHANNEL);
+              continue;
+            }
+            lgProcessedChannelsRef.current.add(call.CHANNEL);
+
+            if (isMissedCall(call.STATUS)) {
+              await handleLGMissedCall(hospital, call);
+            }
+          }
+        } catch (err) {
+          console.error(`LG 폴링 오류 (${hospital.name}):`, err);
+        }
+      }
+    };
+
+    // 초기 폴링 (기준선 설정)
+    pollOnce();
+
+    const interval = setInterval(pollOnce, 60_000);
+    return () => clearInterval(interval);
+  }, [hospitals, user]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const handleDeleteRegistrations = async (phone: string, hospitalId?: string) => {
     try {

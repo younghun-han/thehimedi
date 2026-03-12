@@ -8,7 +8,8 @@ export interface Hospital {
   message: string;
   landingLink: string;
   apiKey: string;
-  carrierApiKey?: string;
+  carrierApiKey?: string;   // KT/STB: API Key | LG: 070번호 (id)
+  carrierApiPass?: string;  // LG 전용: 비밀번호
   carrier?: 'KT' | 'STB' | 'LG';
   senderNumber?: string; // 솔라피 발신번호 (e.g. "01012345678")
 
