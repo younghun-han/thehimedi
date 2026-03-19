@@ -162,13 +162,15 @@ export default async function handler(req, res) {
       continue;
     }
 
-    // 새 미수신 통화 처리
+    // 새 통화 처리 (미수신 + 통화종료)
     let newLastTime = lastCallTime;
     let smsSent = 0;
 
     for (const call of calls) {
       if (call.TIME <= lastCallTime) continue;
-      if (call.STATUS !== 'NO ANSWER' && call.STATUS !== 'CANCEL') {
+      const isMissed = call.STATUS === 'NO ANSWER' || call.STATUS === 'CANCEL';
+      const isAnswered = call.STATUS === 'ANSWERED';
+      if (!isMissed && !isAnswered) {
         if (call.TIME > newLastTime) newLastTime = call.TIME;
         continue;
       }
@@ -192,18 +194,23 @@ export default async function handler(req, res) {
         ? crypto.randomUUID()
         : Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-      const message = hospital.message || '';
+      const triggerType = isMissed ? 'missed' : 'callEnded';
+      const message = isMissed
+        ? (hospital.message || '')
+        : (hospital.call_ended_message || '');
       const landingLink = hospital.landing_link || '';
+
       let resolvedMessage = message
         .replace(/#{병원명}/g, hospital.name)
         .replace(/{병원명}/g, hospital.name)
         .replace(/#{고객명}/g, '고객님')
-        .replace(/{고객명}/g, '고객님');
+        .replace(/{고객명}/g, '고객님')
+        .replace(/#{홈페이지}/g, '')   // 랜딩 없으면 변수 제거
+        .replace(/{홈페이지}/g, '');
 
       if (landingLink) {
         const trackingUrl = `${process.env.APP_URL || 'https://thehimedi.vercel.app'}/?track=${encodeURIComponent(logId)}&dest=${encodeURIComponent(landingLink)}`;
-        resolvedMessage = resolvedMessage.replace(/#{홈페이지}/g, '').replace(/{홈페이지}/g, '').trim()
-          + '\n\n' + trackingUrl;
+        resolvedMessage = resolvedMessage.trim() + '\n\n' + trackingUrl;
       }
 
       let success = false;
@@ -234,7 +241,7 @@ export default async function handler(req, res) {
         status: success ? 'Success' : (hospital.sender_number && resolvedMessage ? 'Failed' : 'Missed'),
         content: resolvedMessage,
         landing_visits: 0,
-        trigger_type: 'missed',
+        trigger_type: triggerType,
         error_message: errorMessage || null,
       });
 

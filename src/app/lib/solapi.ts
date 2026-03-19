@@ -89,16 +89,14 @@ export async function sendMessages(
         throw new Error(data?.message || `솔라피 API 오류 (${response.status})`);
     }
 
-    // 결과 파싱
-    const results: SolapiSendResult[] = formattedMessages.map((msg, i) => {
-        const msgResult = data?.messages?.[i];
-        return {
-            success: msgResult?.statusCode === '2000',
-            messageId: msgResult?.messageId,
-            to: msg.to,
-            error: msgResult?.statusCode !== '2000' ? msgResult?.statusMessage : undefined,
-        };
-    });
+    // 결과 파싱 (send-many 응답은 group 객체, messages 배열 없음)
+    const registeredSuccess = data?.count?.registeredSuccess ?? 0;
+    const results: SolapiSendResult[] = formattedMessages.map((msg) => ({
+        success: registeredSuccess > 0,
+        messageId: data?.groupId,
+        to: msg.to,
+        error: registeredSuccess === 0 ? (data?.log?.slice(-1)?.[0]?.message || JSON.stringify(data)) : undefined,
+    }));
 
     const successCount = results.filter(r => r.success).length;
     const failCount = results.filter(r => !r.success).length;

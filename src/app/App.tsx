@@ -233,10 +233,10 @@ export default function App() {
     }
 
     // 3. Automatic Landing Page URL (Always append to the bottom if exists)
+    // {홈페이지} 변수는 항상 제거 (랜딩 없으면 빈 문자, 있으면 아래에 트래킹 URL 추가)
+    resolved = resolved.replace(/#{홈페이지}/g, '').replace(/{홈페이지}/g, '');
     if (hospital.landingLink) {
       const trackingUrl = buildTrackingUrl(logId, hospital.landingLink);
-      // Remove any existing manual {홈페이지} variables to avoid confusion
-      resolved = resolved.replace(/#{홈페이지}/g, '').replace(/{홈페이지}/g, '');
       resolved = resolved.trim() + "\n\n" + trackingUrl;
     }
 
