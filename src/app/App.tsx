@@ -219,8 +219,20 @@ export default function App() {
     return `${base}/?track=${encodeURIComponent(logId)}&dest=${encodeURIComponent(destUrl)}`;
   };
 
+  // TinyURL API로 URL 단축 (실패 시 원본 반환)
+  const shortenUrl = async (url: string): Promise<string> => {
+    try {
+      const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+      if (!res.ok) return url;
+      const short = await res.text();
+      return short.startsWith('https://') ? short : url;
+    } catch {
+      return url;
+    }
+  };
+
   // Replace variables in message with actual data and append tracking link
-  const resolveMessageWithTracking = (rawMessage: string, hospital: Hospital, logId: string, receiverNumber?: string) => {
+  const resolveMessageWithTracking = async (rawMessage: string, hospital: Hospital, logId: string, receiverNumber?: string): Promise<string> => {
     let resolved = rawMessage;
 
     // 1. Hospital Name
@@ -234,7 +246,7 @@ export default function App() {
 
     // 3. Landing Page URL - {예약링크}/{홈페이지} 변수 치환 또는 마지막 줄에 자동 추가
     const trackingUrl = hospital.landingLink
-      ? buildTrackingUrl(logId, hospital.landingLink)
+      ? await shortenUrl(buildTrackingUrl(logId, hospital.landingLink))
       : '';
 
     if (trackingUrl) {
@@ -270,13 +282,13 @@ export default function App() {
       }
 
       // 로그 ID 미리 생성 (랜딩 트래킹용) - Must be a valid UUID to match DB schema safely
-      const logEntries = targetNumbers.map((targetNumber, idx) => {
+      const logEntries = await Promise.all(targetNumbers.map(async (targetNumber) => {
         const logId = crypto.randomUUID();
         const resolvedMessage = hospital
-          ? resolveMessageWithTracking(message, hospital, logId, targetNumber)
+          ? await resolveMessageWithTracking(message, hospital, logId, targetNumber)
           : message;
         return { logId, targetNumber, resolvedMessage };
-      });
+      }));
 
       // 솔라피 실제 발송
       let sendResults: Array<{ success: boolean; error?: string }> = logEntries.map(() => ({ success: false }));
@@ -334,7 +346,7 @@ export default function App() {
 
     const message = hospital.message || '';
     const resolvedMessage = message
-      ? resolveMessageWithTracking(message, hospital, logId, callerNumber)
+      ? await resolveMessageWithTracking(message, hospital, logId, callerNumber)
       : '';
 
     let success = false;
