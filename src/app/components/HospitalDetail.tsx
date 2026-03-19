@@ -94,7 +94,7 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
     const numbers = new Set<string>();
     registrations.forEach(reg => {
       if (reg.phone && reg.phone.trim() !== '') {
-        numbers.add(reg.phone);
+        numbers.add(reg.phone.replace(/-/g, '').trim()); // 하이픈 제거 후 중복 제거
       }
     });
     return Array.from(numbers);
