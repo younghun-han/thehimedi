@@ -553,6 +553,7 @@ export default function App() {
       {currentView === 'dashboard' && user.role === 'master' && (
         <HospitalList
           hospitals={hospitals}
+          logs={logs}
           onSelectHospital={handleSelectHospital}
           onAddHospital={handleAddHospitalClick}
         />

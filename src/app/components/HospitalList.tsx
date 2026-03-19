@@ -1,16 +1,25 @@
 import React, { useState } from 'react';
 import { Search, Plus, PhoneMissed, CheckCircle, XCircle, MoreVertical } from 'lucide-react';
-import { Hospital } from '../lib/types';
+import { Hospital, CallLog } from '../lib/types';
 import { motion } from 'framer-motion';
 
 interface HospitalListProps {
   hospitals: Hospital[];
+  logs?: CallLog[];
   onSelectHospital: (id: string) => void;
   onAddHospital?: () => void;
 }
 
-export const HospitalList: React.FC<HospitalListProps> = ({ hospitals, onSelectHospital, onAddHospital }) => {
+export const HospitalList: React.FC<HospitalListProps> = ({ hospitals, logs = [], onSelectHospital, onAddHospital }) => {
   const [searchTerm, setSearchTerm] = useState('');
+
+  // call_logs에서 병원별 부재중 횟수 실시간 집계
+  const missedCountMap = logs.reduce<Record<string, number>>((acc, log) => {
+    if (log.triggerType === 'missed') {
+      acc[log.hospitalId] = (acc[log.hospitalId] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
 
   const filteredHospitals = hospitals.filter(h =>
     h.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -80,7 +89,7 @@ export const HospitalList: React.FC<HospitalListProps> = ({ hospitals, onSelectH
                   <td className="px-6 py-4 text-sm text-[#E2E3E4]">
                     <div className="flex items-center">
                       <PhoneMissed size={16} className="text-red-400 mr-2" />
-                      <span className="font-semibold">{hospital.missedCalls}</span>
+                      <span className="font-semibold">{missedCountMap[hospital.id] ?? 0}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm">
