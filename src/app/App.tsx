@@ -383,6 +383,11 @@ export default function App() {
       const created = await db.createLog(newLog);
       setLogs(prev => [created, ...prev]);
       if (success) toast.success(`${callerNumber} 미수신 SMS 자동 발송`);
+      // 브라우저 처리 후 DB의 lg_last_call_time 업데이트 → 크론 중복 발송 방지
+      await supabase
+        .from('hospitals')
+        .update({ lg_last_call_time: call.TIME })
+        .eq('id', hospital.id);
     } catch (err) {
       console.error('LG 로그 저장 실패:', err);
     }

@@ -188,13 +188,14 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // 중복 체크: 같은 CHANNEL 로그 있으면 스킵
+      // 중복 체크: 최근 5분 내 동일 발신자 로그 있으면 스킵 (하이픈 제거 통일)
+      const callerNormalized = call.SRC.replace(/-/g, '');
       const { data: existing } = await supabase
         .from('call_logs')
         .select('id')
         .eq('hospital_id', hospital.id)
-        .eq('caller_number', call.SRC)
-        .gte('timestamp', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // 최근 5분
+        .eq('caller_number', callerNormalized)
+        .gte('timestamp', new Date(Date.now() - 5 * 60 * 1000).toISOString())
         .limit(1);
 
       if (existing?.length > 0) {
@@ -261,7 +262,7 @@ export default async function handler(req, res) {
         id: logId,
         hospital_id: hospital.id,
         timestamp: utcTimestamp,
-        caller_number: call.SRC,
+        caller_number: callerNormalized,
         receiver_number: hospital.carrier_api_key || '',
         status: success ? 'Success' : (hospital.sender_number && resolvedMessage ? 'Failed' : 'Missed'),
         content: resolvedMessage,
