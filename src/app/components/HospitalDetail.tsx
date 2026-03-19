@@ -482,7 +482,7 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  * 메시지 내 <code>#{"{"}&quot;홈페이지&quot;{"}"}</code> 변수 사용 시 이 링크로 치환됩니다.
+                  * 트래킹 코드가 포함된 링크가 문자 마지막 줄에 자동으로 추가됩니다. 메시지에 <code>{"{예약링크}"}</code> 변수를 직접 삽입할 수도 있습니다.
                 </p>
               </FormGroup>
 
@@ -680,7 +680,7 @@ const SettingsSectionIcon = () => (
   </svg>
 );
 
-const StatusBadge: React.FC<{ status: 'Success' | 'Failed' }> = ({ status }) => {
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const isSuccess = status === 'Success';
   return (
     <span className={`flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${isSuccess ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'

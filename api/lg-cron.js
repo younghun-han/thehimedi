@@ -204,13 +204,24 @@ export default async function handler(req, res) {
         .replace(/#{병원명}/g, hospital.name)
         .replace(/{병원명}/g, hospital.name)
         .replace(/#{고객명}/g, '고객님')
-        .replace(/{고객명}/g, '고객님')
-        .replace(/#{홈페이지}/g, '')   // 랜딩 없으면 변수 제거
-        .replace(/{홈페이지}/g, '');
+        .replace(/{고객명}/g, '고객님');
 
-      if (landingLink) {
-        const trackingUrl = `${process.env.APP_URL || 'https://thehimedi.vercel.app'}/?track=${encodeURIComponent(logId)}&dest=${encodeURIComponent(landingLink)}`;
-        resolvedMessage = resolvedMessage.trim() + '\n\n' + trackingUrl;
+      const trackingUrl = landingLink
+        ? `${process.env.APP_URL || 'https://thehimedi.vercel.app'}/?track=${encodeURIComponent(logId)}&dest=${encodeURIComponent(landingLink)}`
+        : '';
+
+      if (trackingUrl) {
+        const hasVar = /#{예약링크}|{예약링크}|#{홈페이지}|{홈페이지}/.test(resolvedMessage);
+        resolvedMessage = resolvedMessage
+          .replace(/#{예약링크}/g, trackingUrl).replace(/{예약링크}/g, trackingUrl)
+          .replace(/#{홈페이지}/g, trackingUrl).replace(/{홈페이지}/g, trackingUrl);
+        if (!hasVar) {
+          resolvedMessage = resolvedMessage.trim() + '\n\n' + trackingUrl;
+        }
+      } else {
+        resolvedMessage = resolvedMessage
+          .replace(/#{예약링크}/g, '').replace(/{예약링크}/g, '')
+          .replace(/#{홈페이지}/g, '').replace(/{홈페이지}/g, '');
       }
 
       let success = false;

@@ -232,12 +232,28 @@ export default function App() {
       resolved = resolved.replace(/#{고객명}/g, patientName).replace(/{고객명}/g, patientName);
     }
 
-    // 3. Automatic Landing Page URL (Always append to the bottom if exists)
-    // {홈페이지} 변수는 항상 제거 (랜딩 없으면 빈 문자, 있으면 아래에 트래킹 URL 추가)
-    resolved = resolved.replace(/#{홈페이지}/g, '').replace(/{홈페이지}/g, '');
-    if (hospital.landingLink) {
-      const trackingUrl = buildTrackingUrl(logId, hospital.landingLink);
-      resolved = resolved.trim() + "\n\n" + trackingUrl;
+    // 3. Landing Page URL - {예약링크}/{홈페이지} 변수 치환 또는 마지막 줄에 자동 추가
+    const trackingUrl = hospital.landingLink
+      ? buildTrackingUrl(logId, hospital.landingLink)
+      : '';
+
+    if (trackingUrl) {
+      // 변수로 삽입된 경우 치환, 없으면 마지막 줄에 자동 추가
+      const hasVar =
+        /#{예약링크}|{예약링크}|#{홈페이지}|{홈페이지}/.test(resolved);
+      resolved = resolved
+        .replace(/#{예약링크}/g, trackingUrl)
+        .replace(/{예약링크}/g, trackingUrl)
+        .replace(/#{홈페이지}/g, trackingUrl)
+        .replace(/{홈페이지}/g, trackingUrl);
+      if (!hasVar) {
+        resolved = resolved.trim() + "\n\n" + trackingUrl;
+      }
+    } else {
+      // 랜딩 링크 없으면 변수 제거
+      resolved = resolved
+        .replace(/#{예약링크}/g, '').replace(/{예약링크}/g, '')
+        .replace(/#{홈페이지}/g, '').replace(/{홈페이지}/g, '');
     }
 
     return resolved;

@@ -15,11 +15,12 @@ const VARIABLES: Record<TemplateType, { key: string; label: string; desc: string
   missed: [
     { key: '{고객명}', label: '고객명', desc: '전화 건 사람의 이름 (저장된 경우)' },
     { key: '{병원명}', label: '병원명', desc: '설정된 병원 이름' },
+    { key: '{예약링크}', label: '랜딩링크', desc: '랜딩 페이지 링크 (트래킹 포함) - 생략 시 마지막 줄에 자동 추가' },
   ],
   callEnded: [
     { key: '{고객명}', label: '고객명', desc: '통화 상대방 이름' },
     { key: '{병원명}', label: '병원명', desc: '설정된 병원 이름' },
-    { key: '{예약링크}', label: '예약링크', desc: '온라인 예약 페이지' },
+    { key: '{예약링크}', label: '랜딩링크', desc: '랜딩 페이지 링크 (트래킹 포함) - 생략 시 마지막 줄에 자동 추가' },
   ],
   review: [
     { key: '{고객명}', label: '고객명', desc: '방문 고객 이름' },
