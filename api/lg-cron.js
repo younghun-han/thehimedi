@@ -32,7 +32,7 @@ async function sendSolapiSms(to, from, text) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: auth },
     body: JSON.stringify({
-      messages: [{ to: to.replace(/-/g, ''), from: from.replace(/-/g, ''), text, type }],
+      messages: [{ to: to.replace(/-/g, ''), from: from.replace(/-/g, ''), text, type, ...(type === 'LMS' ? { subject: '안내' } : {}) }],
     }),
   });
   const data = await res.json();

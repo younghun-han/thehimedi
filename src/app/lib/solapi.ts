@@ -63,12 +63,17 @@ export async function sendMessages(
     const authHeader = await buildAuthHeader();
 
     // 메시지 타입 자동 결정
-    const formattedMessages = messages.map(msg => ({
-        to: msg.to.replace(/-/g, ''), // 하이픈 제거
-        from: msg.from.replace(/-/g, ''),
-        text: msg.text,
-        type: msg.type ?? (msg.text.length > 45 ? 'LMS' : 'SMS'),
-    }));
+    const formattedMessages = messages.map(msg => {
+        const type = msg.type ?? (msg.text.length > 45 ? 'LMS' : 'SMS');
+        return {
+            to: msg.to.replace(/-/g, ''),
+            from: msg.from.replace(/-/g, ''),
+            text: msg.text,
+            type,
+            // LMS 미설정 시 첫 40바이트가 자동 제목으로 들어가 내용 중복 표시됨
+            ...(type === 'LMS' ? { subject: '안내' } : {}),
+        };
+    });
 
     const body = {
         messages: formattedMessages,
