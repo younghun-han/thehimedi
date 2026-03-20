@@ -234,68 +234,31 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
               </div>
 
               <div className="mb-6 space-y-4">
-                <FormGroup label="통신사 선택">
-                  <div className="flex space-x-2">
-                    {(['KT', 'STB', 'LG'] as const).map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => handleChange('carrier', c)}
-                        className={`flex-1 py-2 rounded-lg border text-sm font-bold transition-all ${(formData.carrier || 'KT') === c
-                          ? 'bg-[#00E2E3] text-black border-[#00E2E3]'
-                          : 'bg-[#2A2A2A] text-gray-400 border-[#383838] hover:border-gray-500'
-                          }`}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                </FormGroup>
-
-                <FormGroup label={`${formData.carrier || 'KT'} API 설정`}>
+                <FormGroup label="LG API 설정">
                   <div className="bg-[#252525] p-4 rounded-lg border border-[#333] space-y-2">
-                    {(formData.carrier || 'KT') === 'LG' ? (
-                      <>
-                        <div className="relative">
-                          <Shield size={18} className="absolute left-3 top-3 text-gray-400" />
-                          <input
-                            type="text"
-                            value={formData.carrierApiKey || ''}
-                            onChange={(e) => handleChange('carrierApiKey', e.target.value)}
-                            placeholder="070 번호 입력 (예: 07012341234)"
-                            className="w-full bg-[#383838] border border-[#4A4A4A] rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none focus:border-[#00E2E3] transition-colors font-mono text-sm placeholder-gray-600"
-                          />
-                        </div>
-                        <div className="relative">
-                          <Shield size={18} className="absolute left-3 top-3 text-gray-400" />
-                          <input
-                            type="password"
-                            value={formData.carrierApiPass || ''}
-                            onChange={(e) => handleChange('carrierApiPass', e.target.value)}
-                            placeholder="centrex.uplus.co.kr 로그인 비밀번호"
-                            className="w-full bg-[#383838] border border-[#4A4A4A] rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none focus:border-[#00E2E3] transition-colors font-mono text-sm placeholder-gray-600"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          * LG U+ 고급형 센트릭스 계정 정보를 입력해주세요. 비밀번호는 암호화되어 저장됩니다.
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="relative">
-                          <Shield size={18} className="absolute left-3 top-3 text-gray-400" />
-                          <input
-                            type="text"
-                            value={formData.carrierApiKey || ''}
-                            onChange={(e) => handleChange('carrierApiKey', e.target.value)}
-                            placeholder={`${formData.carrier || 'KT'} API Key 입력`}
-                            className="w-full bg-[#383838] border border-[#4A4A4A] rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none focus:border-[#00E2E3] transition-colors font-mono text-sm placeholder-gray-600"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          * 현재 {formData.carrier || 'KT'} API 연동을 위한 키를 입력해주세요.
-                        </p>
-                      </>
-                    )}
+                    <div className="relative">
+                      <Shield size={18} className="absolute left-3 top-3 text-gray-400" />
+                      <input
+                        type="text"
+                        value={formData.carrierApiKey || ''}
+                        onChange={(e) => handleChange('carrierApiKey', e.target.value)}
+                        placeholder="070 번호 입력 (예: 07012341234)"
+                        className="w-full bg-[#383838] border border-[#4A4A4A] rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none focus:border-[#00E2E3] transition-colors font-mono text-sm placeholder-gray-600"
+                      />
+                    </div>
+                    <div className="relative">
+                      <Shield size={18} className="absolute left-3 top-3 text-gray-400" />
+                      <input
+                        type="password"
+                        value={formData.carrierApiPass || ''}
+                        onChange={(e) => handleChange('carrierApiPass', e.target.value)}
+                        placeholder="centrex.uplus.co.kr 로그인 비밀번호"
+                        className="w-full bg-[#383838] border border-[#4A4A4A] rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none focus:border-[#00E2E3] transition-colors font-mono text-sm placeholder-gray-600"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      * LG U+ 고급형 센트릭스 계정 정보를 입력해주세요.
+                    </p>
                   </div>
                 </FormGroup>
               </div>
