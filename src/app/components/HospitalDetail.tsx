@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Save, Link as LinkIcon, Key, Clock, Phone, CheckCircle, XCircle, Shield, PhoneOff, ChevronDown, MousePointerClick, AlertTriangle, ArrowDownLeft, Send, Users, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Save, Link as LinkIcon, Key, Clock, Phone, CheckCircle, XCircle, Shield, PhoneOff, ChevronDown, MousePointerClick, AlertTriangle, ArrowDownLeft, Send, Users, RotateCcw, Wifi, WifiOff, Loader } from 'lucide-react';
 import { Hospital, CallLog, MessageTemplate, PatientRegistration } from '../lib/types';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { MessageTemplateEditor } from './MessageTemplateEditor';
 import { toast } from 'sonner';
+import { getLGInboundCalls } from '../lib/lg-api';
 
 const COST_PER_MESSAGE = 30; // Estimated cost per message (KRW)
 
@@ -73,6 +74,32 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
   const [confirmPwReset, setConfirmPwReset] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmManualSend, setConfirmManualSend] = useState(false);
+  const [lgTestStatus, setLgTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [lgTestMessage, setLgTestMessage] = useState('');
+
+  const testLgConnection = async () => {
+    if (!formData.carrierApiKey || !formData.carrierApiPass) {
+      setLgTestStatus('error');
+      setLgTestMessage('070 번호와 비밀번호를 입력해주세요.');
+      return;
+    }
+    setLgTestStatus('loading');
+    setLgTestMessage('');
+    try {
+      const data = await getLGInboundCalls(formData.carrierApiKey, formData.carrierApiPass);
+      if (data?.SVC_RT === '0000') {
+        const count = Array.isArray(data.DATAS) ? data.DATAS.length : 0;
+        setLgTestStatus('ok');
+        setLgTestMessage(`연결 성공 — 최근 통화 ${count}건 조회됨`);
+      } else {
+        setLgTestStatus('error');
+        setLgTestMessage(data?.SVC_MSG || '인증 실패');
+      }
+    } catch (e: any) {
+      setLgTestStatus('error');
+      setLgTestMessage(e?.message || '연결 실패');
+    }
+  };
 
   // When form data changes, reset confirmation states
   useEffect(() => {
@@ -259,6 +286,21 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
                     <p className="text-xs text-gray-500">
                       * LG U+ 고급형 센트릭스 계정 정보를 입력해주세요.
                     </p>
+                    <button
+                      onClick={testLgConnection}
+                      disabled={lgTestStatus === 'loading'}
+                      className="w-full mt-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-[#4A4A4A] bg-[#2A2A2A] text-sm text-gray-300 hover:border-[#00E2E3] hover:text-white transition-colors disabled:opacity-50"
+                    >
+                      {lgTestStatus === 'loading'
+                        ? <><Loader size={15} className="animate-spin" /> 연결 확인 중...</>
+                        : <><Wifi size={15} /> API 연결 테스트</>}
+                    </button>
+                    {lgTestStatus !== 'idle' && lgTestStatus !== 'loading' && (
+                      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${lgTestStatus === 'ok' ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-red-900/30 text-red-400 border border-red-800'}`}>
+                        {lgTestStatus === 'ok' ? <Wifi size={14} /> : <WifiOff size={14} />}
+                        {lgTestMessage}
+                      </div>
+                    )}
                   </div>
                 </FormGroup>
               </div>
