@@ -78,10 +78,18 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
   const [lgTestStatus, setLgTestStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const [lgTestMessage, setLgTestMessage] = useState('');
 
+  // 070-XXXX-XXXX 형식 검증 (하이픈 2개 필수)
+  const isValidLgApiKey = (key: string) => /^\d{2,4}-\d{3,4}-\d{4}$/.test(key.trim());
+
   const testLgConnection = async () => {
     if (!formData.carrierApiKey || !formData.carrierApiPass) {
       setLgTestStatus('error');
       setLgTestMessage('070 번호와 비밀번호를 입력해주세요.');
+      return;
+    }
+    if (!isValidLgApiKey(formData.carrierApiKey)) {
+      setLgTestStatus('error');
+      setLgTestMessage('070 번호 형식이 올바르지 않습니다. 예: 070-7576-0371 (하이픈 포함)');
       return;
     }
     setLgTestStatus('loading');
@@ -273,9 +281,15 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
                         type="text"
                         value={formData.carrierApiKey || ''}
                         onChange={(e) => handleChange('carrierApiKey', e.target.value)}
-                        placeholder="070 번호 입력 (예: 07012341234)"
-                        className="w-full bg-[#383838] border border-[#4A4A4A] rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none focus:border-[#00E2E3] transition-colors font-mono text-sm placeholder-gray-600"
+                        placeholder="070 번호 입력 (예: 070-7576-0371)"
+                        className={`w-full bg-[#383838] border rounded-lg pl-10 pr-4 py-2.5 text-white focus:outline-none transition-colors font-mono text-sm placeholder-gray-600 ${formData.carrierApiKey && !isValidLgApiKey(formData.carrierApiKey)
+                            ? 'border-red-500 focus:border-red-500'
+                            : 'border-[#4A4A4A] focus:border-[#00E2E3]'
+                          }`}
                       />
+                      {formData.carrierApiKey && !isValidLgApiKey(formData.carrierApiKey) && (
+                        <p className="text-red-400 text-xs mt-1 ml-1">형식 오류: 070-XXXX-XXXX 형식으로 입력해주세요 (하이픈 2개 필수)</p>
+                      )}
                     </div>
                     <div className="relative">
                       <Shield size={18} className="absolute left-3 top-3 text-gray-400" />
