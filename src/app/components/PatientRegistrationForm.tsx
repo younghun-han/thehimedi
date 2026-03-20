@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/db';
 import { Hospital } from '../lib/types';
 
@@ -11,6 +11,7 @@ export const PatientRegistrationForm: React.FC<PatientRegistrationFormProps> = (
     const [notFound, setNotFound] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const submittingRef = useRef(false); // 더블클릭 / StrictMode 중복 제출 방지
     const [privacyChecked, setPrivacyChecked] = useState(false);
 
     const [form, setForm] = useState({ name: '', purpose: '' });
@@ -26,6 +27,14 @@ export const PatientRegistrationForm: React.FC<PatientRegistrationFormProps> = (
         };
         find();
     }, [hospitalCode]);
+
+    // 병원명을 브라우저 탭 타이틀로 설정
+    useEffect(() => {
+        if (!hospital) return;
+        const prevTitle = document.title;
+        document.title = hospital.name;
+        return () => { document.title = prevTitle; };
+    }, [hospital]);
 
     const getFullPhone = () => `010-${phone.mid}-${phone.last}`;
 
@@ -43,6 +52,8 @@ export const PatientRegistrationForm: React.FC<PatientRegistrationFormProps> = (
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!validate() || !hospital) return;
+        if (submittingRef.current) return; // 이미 제출 중이면 차단
+        submittingRef.current = true;
         setIsLoading(true);
         await db.createRegistration({
             hospitalId: hospital.id,
@@ -51,6 +62,7 @@ export const PatientRegistrationForm: React.FC<PatientRegistrationFormProps> = (
             purpose: form.purpose.trim(),
         });
         setIsLoading(false);
+        submittingRef.current = false;
         setSubmitted(true);
     };
 

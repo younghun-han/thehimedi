@@ -458,7 +458,7 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     // 로컬 dev에서는 /api/lg-proxy 없음 → 크론이 서버에서 처리
-    if (import.meta.env.DEV) return;
+    if ((import.meta as any).env?.DEV) return;
 
     const lgHospitals = hospitals.filter(
       h => h.carrier === 'LG' && h.carrierApiKey && h.carrierApiPass
@@ -466,6 +466,9 @@ export default function App() {
     if (lgHospitals.length === 0) return;
 
     const pollOnce = async () => {
+      // 탭이 백그라운드 상태이면 폴링 스킵 (불필요한 외부 API 호출 방지)
+      if (document.hidden) return;
+
       for (const hospital of lgHospitals) {
         try {
           const data = await getLGInboundCalls(hospital.carrierApiKey!, hospital.carrierApiPass!);

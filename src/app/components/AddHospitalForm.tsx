@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ArrowLeft, Save, Building } from 'lucide-react';
 import { Hospital } from '../lib/types';
 import { motion } from 'framer-motion';
@@ -17,6 +17,7 @@ export const AddHospitalForm: React.FC<AddHospitalFormProps> = ({ onBack, onSave
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false); // 동기 잠금: React StrictMode 이중 실행 / 더블클릭 방지
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -24,6 +25,8 @@ export const AddHospitalForm: React.FC<AddHospitalFormProps> = ({ onBack, onSave
       return;
     }
 
+    if (savingRef.current) return; // 이미 처리 중이면 즉시 차단
+    savingRef.current = true;
     setIsSaving(true);
 
     const newHospital: Hospital = {
@@ -41,6 +44,7 @@ export const AddHospitalForm: React.FC<AddHospitalFormProps> = ({ onBack, onSave
     // password defaults to code.toLowerCase() + 'pw' per server logic
 
     await onSave(newHospital);
+    savingRef.current = false;
     setIsSaving(false);
   };
 

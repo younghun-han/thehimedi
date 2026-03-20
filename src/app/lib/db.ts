@@ -1,6 +1,27 @@
 import { supabase } from './supabase';
 import { Hospital, CallLog, MessageTemplate, AuthUser, PatientRegistration } from './types';
 
+// ─── 비밀번호 해싱 (SHA-256) ────────────────────────────────────────────────────
+async function hashPassword(plain: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/** 해시 비교 (타이밍 공격 방지용 상수 시간 비교) */
+async function verifyPassword(plain: string, stored: string): Promise<boolean> {
+  // 해시된 값인 경우 (64자 hex)
+  if (stored.length === 64) {
+    const hashed = await hashPassword(plain);
+    return hashed === stored;
+  }
+  // 레거시 평문 비교 (마이그레이션 기간 하위 호환)
+  return plain === stored;
+}
+
 // ─── 타입 매핑 헬퍼 ────────────────────────────────────────────────────────────
 
 function rowToHospital(row: any): Hospital {
@@ -120,8 +141,9 @@ class SupabaseDB {
     const row = hospitalToRow(hospital);
     // Let Supabase generate UUID - remove empty id
     if (!row.id) delete (row as any).id;
-    // Auto-set password from code if not provided
-    if (!row.password) row.password = hospital.code.toLowerCase() + 'pw';
+    // Auto-set password from code if not provided, then hash it
+    const plainPw = row.password || (hospital.code.toLowerCase() + 'pw');
+    row.password = await hashPassword(plainPw);
 
     const { data, error } = await supabase
       .from('hospitals')
@@ -144,6 +166,8 @@ class SupabaseDB {
   }
 
   async deleteHospital(id: string): Promise<void> {
+    // message_templates에는 hospital_id FK CASCADE가 없으므로 먼저 수동 삭제
+    await supabase.from('message_templates').delete().eq('hospital_id', id);
     const { error } = await supabase
       .from('hospitals')
       .delete()
@@ -152,9 +176,10 @@ class SupabaseDB {
   }
 
   async updateHospitalPassword(hospitalId: string, newPassword: string): Promise<void> {
+    const hashed = await hashPassword(newPassword);
     const { error } = await supabase
       .from('hospitals')
-      .update({ password: newPassword })
+      .update({ password: hashed })
       .eq('id', hospitalId);
     if (error) throw new Error(error.message);
   }
@@ -162,10 +187,10 @@ class SupabaseDB {
   // ── Logs ───────────────────────────────────────────────────────────────────
 
   async getLogs(): Promise<CallLog[]> {
-    // Fetch both tables concurrently
+    // Fetch both tables concurrently (한 테이블당 1000건 → 병합 후 최신 1000건 반환)
     const [msgLogsRes, skbLogsRes] = await Promise.all([
-      supabase.from('call_logs').select('*').order('timestamp', { ascending: false }).limit(500),
-      supabase.from('skb_call_history').select('*').order('created_at', { ascending: false }).limit(500)
+      supabase.from('call_logs').select('*').order('timestamp', { ascending: false }).limit(1000),
+      supabase.from('skb_call_history').select('*').order('created_at', { ascending: false }).limit(1000)
     ]);
 
     if (msgLogsRes.error) console.error('getLogs (msg):', msgLogsRes.error.message);
@@ -173,7 +198,6 @@ class SupabaseDB {
 
     const msgLogs = (msgLogsRes.data ?? []).map(rowToLog);
     const skbLogs = (skbLogsRes.data ?? []).map((row: any): CallLog => {
-      // Map SKB status -> CallLog status enum
       let status: CallLog['status'] = 'Completed';
       let triggerType: CallLog['triggerType'] = 'skb_completed';
       if (row.call_type === 'incoming') { status = 'Incoming'; triggerType = 'skb_incoming'; }
@@ -189,18 +213,18 @@ class SupabaseDB {
         content: `SKB통화 (${row.call_type})`,
         triggerType,
         type: 'skb_call',
+        landingVisits: 0, // #13: SKB 로그는 랜딩 트래킹 없음 → 기본값 0
         startedAt: row.started_at,
         endedAt: row.ended_at,
         durationSec: row.duration_sec
       }
     });
 
-    // Merge and sort
     const merged = [...msgLogs, ...skbLogs].sort((a, b) =>
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
-    return merged.slice(0, 500); // Return most recent 500 overall
+    return merged.slice(0, 1000); // #10: 최신 1000건 반환
   }
 
   async createLog(log: CallLog): Promise<CallLog> {
@@ -268,17 +292,24 @@ class SupabaseDB {
   }
 
   async updateTemplates(templates: MessageTemplate[], hospitalId?: string | null): Promise<MessageTemplate[]> {
-    // Delete all templates for this account first, then re-insert
+    // 삭제 전 현재 템플릿 백업 (삽입 실패 시 롤백용)
     let deleteQuery = supabase.from('message_templates').delete();
     if (hospitalId === null) {
       deleteQuery = deleteQuery.is('hospital_id', null);
     } else if (hospitalId) {
       deleteQuery = deleteQuery.eq('hospital_id', hospitalId);
     } else {
-      // fallback: delete nothing
       return templates;
     }
-    await deleteQuery;
+
+    // 백업 조회
+    let backupQuery = supabase.from('message_templates').select('*');
+    if (hospitalId === null) backupQuery = backupQuery.is('hospital_id', null);
+    else if (hospitalId) backupQuery = backupQuery.eq('hospital_id', hospitalId);
+    const { data: backup } = await backupQuery;
+
+    const { error: deleteError } = await deleteQuery;
+    if (deleteError) throw new Error(deleteError.message);
 
     if (templates.length === 0) return [];
 
@@ -295,9 +326,17 @@ class SupabaseDB {
       .from('message_templates')
       .insert(rows)
       .select();
-    if (error) throw new Error(error.message);
+
+    if (error) {
+      // 삽입 실패 시 백업 복원 시도
+      if (backup && backup.length > 0) {
+        await supabase.from('message_templates').insert(backup).select();
+      }
+      throw new Error(`템플릿 저장 실패: ${error.message}. 이전 데이터 복원을 시도했습니다.`);
+    }
     return (data ?? []).map(rowToTemplate);
   }
+
 
   // ── Auth ──────────────────────────────────────────────────────────────────
 
@@ -309,7 +348,8 @@ class SupabaseDB {
         .eq('id', 1)
         .single();
       if (error || !data) return null;
-      return password === data.password ? { role: 'master' } : null;
+      const masterOk = await verifyPassword(password, data.password);
+      return masterOk ? { role: 'master' } : null;
     }
 
     const { data, error } = await supabase
@@ -319,8 +359,9 @@ class SupabaseDB {
       .single();
     if (error || !data) return null;
 
-    const expectedPw = data.password || (data.code.toLowerCase() + 'pw');
-    if (password === expectedPw) {
+    const storedPw = data.password || (data.code.toLowerCase() + 'pw');
+    const ok = await verifyPassword(password, storedPw);
+    if (ok) {
       return {
         role: 'user',
         hospitalId: data.id,
@@ -345,9 +386,10 @@ class SupabaseDB {
   }
 
   async updateMasterPassword(newPassword: string): Promise<void> {
+    const hashed = await hashPassword(newPassword);
     const { error } = await supabase
       .from('master_config')
-      .update({ password: newPassword })
+      .update({ password: hashed })
       .eq('id', 1);
     if (error) throw new Error(error.message);
   }

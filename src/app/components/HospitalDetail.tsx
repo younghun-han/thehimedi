@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Save, Link as LinkIcon, Key, Clock, Phone, CheckCircle, XCircle, Shield, PhoneOff, ChevronDown, MousePointerClick, AlertTriangle, ArrowDownLeft, Send, Users, RotateCcw, Wifi, WifiOff, Loader } from 'lucide-react';
 import { Hospital, CallLog, MessageTemplate, PatientRegistration } from '../lib/types';
 import { motion } from 'framer-motion';
@@ -42,6 +42,7 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
 
   // Manual Broadcast State
   const [isSending, setIsSending] = useState(false);
+  const sendingRef = useRef(false); // 동기 잠금: 더블클릭 / StrictMode 이중 실행 방지
 
   // Update local state when hospital prop changes
   useEffect(() => {
@@ -141,8 +142,11 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
 
   const executeManualSend = async () => {
     if (!formData.manualMessage) return;
+    if (sendingRef.current) return; // 이미 발송 중이면 차단
+    sendingRef.current = true;
     setIsSending(true);
     await onManualBroadcast(hospital.id, formData.manualMessage, uniqueTargets, formData.senderNumber || '');
+    sendingRef.current = false;
     setIsSending(false);
   };
 
@@ -686,11 +690,17 @@ const SettingsSectionIcon = () => (
 );
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const isSuccess = status === 'Success';
+  const colorClass =
+    status === 'Success' ? 'bg-green-900/30 text-green-400' :
+      status === 'Failed' ? 'bg-red-900/30 text-red-400' :
+        status === 'Missed' ? 'bg-orange-900/30 text-orange-400' :
+          status === 'Incoming' || status === 'Completed'
+            ? 'bg-blue-900/30 text-blue-400'
+            : 'bg-gray-800 text-gray-400';
+  const Icon = status === 'Success' ? CheckCircle : status === 'Incoming' || status === 'Completed' ? CheckCircle : XCircle;
   return (
-    <span className={`flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${isSuccess ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
-      }`}>
-      {isSuccess ? <CheckCircle size={10} className="mr-1" /> : <XCircle size={10} className="mr-1" />}
+    <span className={`flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${colorClass}`}>
+      <Icon size={10} className="mr-1" />
       {status}
     </span>
   );

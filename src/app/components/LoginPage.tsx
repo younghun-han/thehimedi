@@ -11,9 +11,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [failCount, setFailCount] = useState(0);
+    const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+    const [lockSecondsLeft, setLockSecondsLeft] = useState(0);
+
+    // 잠금 카운트다운 타이머
+    React.useEffect(() => {
+        if (!lockedUntil) return;
+        const id = setInterval(() => {
+            const left = Math.ceil((lockedUntil - Date.now()) / 1000);
+            if (left <= 0) { setLockedUntil(null); setLockSecondsLeft(0); setFailCount(0); }
+            else setLockSecondsLeft(left);
+        }, 1000);
+        return () => clearInterval(id);
+    }, [lockedUntil]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (lockedUntil && Date.now() < lockedUntil) return;
         if (!code.trim() || !password.trim()) {
             setError('병원 코드와 비밀번호를 입력해주세요.');
             return;
@@ -22,7 +37,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         setError('');
         const success = await onLogin(code.trim(), password);
         if (!success) {
-            setError('병원 코드 또는 비밀번호가 올바르지 않습니다.');
+            const next = failCount + 1;
+            setFailCount(next);
+            if (next >= 5) {
+                const until = Date.now() + 30_000;
+                setLockedUntil(until);
+                setLockSecondsLeft(30);
+                setError('로그인 5회 실패. 30초 후 다시 시도해주세요.');
+            } else {
+                setError(`병원 코드 또는 비밀번호가 올바르지 않습니다. (${next}/5)`);
+            }
         }
         setIsLoading(false);
     };
@@ -95,13 +119,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                         {error && (
                             <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 text-red-400 text-sm">
                                 {error}
+                                {lockedUntil && lockSecondsLeft > 0 && (
+                                    <span className="ml-1 font-mono font-bold">{lockSecondsLeft}s</span>
+                                )}
                             </div>
                         )}
 
                         {/* Submit button */}
                         <button
                             type="submit"
-                            disabled={isLoading}
+                            disabled={isLoading || !!lockedUntil}
                             className="w-full flex items-center justify-center gap-2 bg-[#00E2E3] text-[#0D0D0D] font-semibold py-3 rounded-lg hover:bg-[#00c8c9] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed mt-2"
                         >
                             {isLoading ? (
