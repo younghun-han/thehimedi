@@ -60,9 +60,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             <div className="relative w-full max-w-md mx-4">
                 {/* Logo / Title */}
                 <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#00E2E3]/10 border border-[#00E2E3]/20 mb-5">
-                        <Lock size={28} className="text-[#00E2E3]" />
-                    </div>
+                    <img src="/logo.png" alt="더하이메디" className="h-20 mx-auto mb-5 object-contain" />
                     <h1 className="text-3xl font-bold text-white tracking-tight">더하이메디</h1>
                     <p className="text-gray-500 mt-2 text-sm">병원 관리 시스템에 로그인하세요</p>
                 </div>

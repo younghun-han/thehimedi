@@ -26,9 +26,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, user,
 
   return (
     <div className="w-56 bg-[#141414] border-r border-[#2A2A2A] flex flex-col h-full text-[#E2E3E4]">
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-[#00E2E3]">관리자 콘솔</h1>
-        <p className="text-xs text-gray-500 mt-1">병원 관리 시스템</p>
+      <div className="p-5 pb-4">
+        <img src="/logo.png" alt="더하이메디 로고" className="w-28 object-contain" />
+        <p className="text-xs text-gray-500 mt-2">병원 관리 시스템</p>
       </div>
 
       <nav className="flex-1 px-4 py-4 space-y-2">
