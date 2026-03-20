@@ -457,6 +457,8 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
+    // 로컬 dev에서는 /api/lg-proxy 없음 → 크론이 서버에서 처리
+    if (import.meta.env.DEV) return;
 
     const lgHospitals = hospitals.filter(
       h => h.carrier === 'LG' && h.carrierApiKey && h.carrierApiPass
