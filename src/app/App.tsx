@@ -219,18 +219,6 @@ export default function App() {
     return `${base}/?track=${encodeURIComponent(logId)}&dest=${encodeURIComponent(destUrl)}`;
   };
 
-  // TinyURL API로 URL 단축 (실패 시 원본 반환)
-  const shortenUrl = async (url: string): Promise<string> => {
-    try {
-      const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
-      if (!res.ok) return url;
-      const short = await res.text();
-      return short.startsWith('https://') ? short : url;
-    } catch {
-      return url;
-    }
-  };
-
   // Replace variables in message with actual data and append tracking link
   const resolveMessageWithTracking = async (rawMessage: string, hospital: Hospital, logId: string, receiverNumber?: string): Promise<string> => {
     let resolved = rawMessage;
@@ -246,7 +234,7 @@ export default function App() {
 
     // 3. Landing Page URL - {예약링크}/{홈페이지} 변수 치환 또는 마지막 줄에 자동 추가
     const trackingUrl = hospital.landingLink
-      ? await shortenUrl(buildTrackingUrl(logId, hospital.landingLink))
+      ? buildTrackingUrl(logId, hospital.landingLink)
       : '';
 
     if (trackingUrl) {
