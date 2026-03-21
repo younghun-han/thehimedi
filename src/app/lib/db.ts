@@ -42,6 +42,9 @@ function rowToHospital(row: any): Hospital {
     enableCallEnded: row.enable_call_ended ?? false,
     callEndedMessage: row.call_ended_message ?? '',
     manualMessage: row.manual_message ?? '',
+    dndEnabled: row.dnd_enabled ?? false,
+    dndStartTime: row.dnd_start_time ?? '22:00',
+    dndEndTime: row.dnd_end_time ?? '08:00',
   };
 }
 
@@ -63,6 +66,9 @@ function hospitalToRow(h: Hospital) {
     enable_call_ended: h.enableCallEnded,
     call_ended_message: h.callEndedMessage,
     manual_message: h.manualMessage,
+    dnd_enabled: h.dndEnabled ?? false,
+    dnd_start_time: h.dndStartTime ?? '22:00',
+    dnd_end_time: h.dndEndTime ?? '08:00',
   };
 }
 

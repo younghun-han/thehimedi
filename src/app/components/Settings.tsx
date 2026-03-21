@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Save, Lock, Clock, Link as LinkIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AuthUser } from '../lib/types';
@@ -24,6 +24,22 @@ export const Settings: React.FC<{ user?: AuthUser | null }> = ({ user }) => {
     startTime: '22:00',
     endTime: '08:00'
   });
+
+  // DND 설정 로드
+  useEffect(() => {
+    if (user?.role === 'user' && user.hospitalId) {
+      db.getHospitals().then(hospitals => {
+        const hospital = hospitals.find(h => h.id === user.hospitalId);
+        if (hospital) {
+          setDndSettings({
+            enabled: hospital.dndEnabled ?? false,
+            startTime: hospital.dndStartTime ?? '22:00',
+            endTime: hospital.dndEndTime ?? '08:00',
+          });
+        }
+      });
+    }
+  }, [user]);
 
   const handleSave = async () => {
     if (!passwordForm.current || !passwordForm.new || !passwordForm.confirm) {
@@ -68,6 +84,28 @@ export const Settings: React.FC<{ user?: AuthUser | null }> = ({ user }) => {
       toast.error('비밀번호 변경 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSaveDnd = async () => {
+    if (user?.role !== 'user' || !user.hospitalId) {
+      toast.error('병원 계정만 DND 설정을 저장할 수 있습니다.');
+      return;
+    }
+    try {
+      const hospitals = await db.getHospitals();
+      const hospital = hospitals.find(h => h.id === user.hospitalId);
+      if (!hospital) return;
+      await db.updateHospital({
+        ...hospital,
+        dndEnabled: dndSettings.enabled,
+        dndStartTime: dndSettings.startTime,
+        dndEndTime: dndSettings.endTime,
+      });
+      toast.success('발송 금지 시간이 저장되었습니다.');
+    } catch (err) {
+      console.error('DND save error:', err);
+      toast.error('저장 중 오류가 발생했습니다.');
     }
   };
 
@@ -221,6 +259,17 @@ export const Settings: React.FC<{ user?: AuthUser | null }> = ({ user }) => {
                     />
                   </InputGroup>
                 </motion.div>
+              )}
+              {user?.role === 'user' && (
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={handleSaveDnd}
+                    className="flex items-center px-4 py-2 bg-[#00E2E3] text-black font-bold rounded-lg hover:bg-[#00c4c5] transition-all text-sm"
+                  >
+                    <Save size={14} className="mr-1.5" />
+                    저장
+                  </button>
+                </div>
               )}
             </div>
           </motion.div>

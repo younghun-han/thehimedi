@@ -191,6 +191,21 @@ export default async function handler(req, res) {
         continue;
       }
 
+      // DND 체크 (KST 기준)
+      if (hospital.dnd_enabled) {
+        const kstNow = new Date(Date.now() + 9 * 3600 * 1000);
+        const hhmm = kstNow.getUTCHours() * 60 + kstNow.getUTCMinutes();
+        const [sh, sm] = (hospital.dnd_start_time || '22:00').split(':').map(Number);
+        const [eh, em] = (hospital.dnd_end_time || '08:00').split(':').map(Number);
+        const start = sh * 60 + sm;
+        const end = eh * 60 + em;
+        const inDnd = start > end ? (hhmm >= start || hhmm < end) : (hhmm >= start && hhmm < end);
+        if (inDnd) {
+          if (call.TIME > newLastTime) newLastTime = call.TIME;
+          continue;
+        }
+      }
+
       // SMS 발송
       const logId = crypto.randomUUID
         ? crypto.randomUUID()

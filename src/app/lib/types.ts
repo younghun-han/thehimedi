@@ -19,6 +19,11 @@ export interface Hospital {
 
   // Manual Trigger
   manualMessage?: string;
+
+  // DND
+  dndEnabled?: boolean;
+  dndStartTime?: string;
+  dndEndTime?: string;
 }
 
 export interface AuthUser {
