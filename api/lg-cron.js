@@ -11,8 +11,8 @@ import { createHash, createHmac } from 'crypto';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY;
-const SOLAPI_API_KEY = process.env.VITE_SOLAPI_API_KEY;
-const SOLAPI_API_SECRET = process.env.VITE_SOLAPI_API_SECRET;
+const SOLAPI_API_KEY = process.env.SOLAPI_API_KEY;
+const SOLAPI_API_SECRET = process.env.SOLAPI_API_SECRET;
 
 // ─── Solapi HMAC-SHA256 인증 ─────────────────────────────────────────────────
 
