@@ -44,18 +44,6 @@ async function sendSolapiSms(to, from, text) {
   };
 }
 
-// ─── URL 단축 (TinyURL) ───────────────────────────────────────────────────────
-
-async function shortenUrl(url) {
-  try {
-    const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
-    if (!res.ok) return url;
-    const short = await res.text();
-    return short.startsWith('https://') ? short : url;
-  } catch {
-    return url;
-  }
-}
 
 // ─── LG API 호출 ─────────────────────────────────────────────────────────────
 
@@ -223,7 +211,7 @@ export default async function handler(req, res) {
       const rawTrackingUrl = landingLink
         ? `${process.env.APP_URL || 'https://thehimedi.vercel.app'}/?track=${encodeURIComponent(logId)}&dest=${encodeURIComponent(landingLink)}`
         : '';
-      const trackingUrl = rawTrackingUrl ? await shortenUrl(rawTrackingUrl) : '';
+      const trackingUrl = rawTrackingUrl;
 
       if (trackingUrl) {
         const hasVar = /#{예약링크}|{예약링크}|#{홈페이지}|{홈페이지}/.test(resolvedMessage);
