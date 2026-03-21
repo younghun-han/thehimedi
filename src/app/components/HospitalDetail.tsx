@@ -661,6 +661,11 @@ export const HospitalDetail: React.FC<HospitalDetailProps> = ({
                       <div className="text-xs text-gray-500 bg-[#141414] p-2 rounded border border-[#333] truncate mb-2">
                         {log.content}
                       </div>
+                      {log.status === 'Failed' && log.errorMessage && (
+                        <div className="text-xs text-red-400 bg-red-900/20 p-2 rounded border border-red-900/40 truncate mb-2">
+                          ⚠ {log.errorMessage}
+                        </div>
+                      )}
 
                       {log.landingVisits !== undefined && (
                         <div className="flex items-center justify-end text-xs text-gray-400">
