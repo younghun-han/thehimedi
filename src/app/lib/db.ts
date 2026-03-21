@@ -57,7 +57,7 @@ function hospitalToRow(h: Hospital) {
     landing_link: h.landingLink,
     api_key: h.apiKey,
     carrier_api_key: h.carrierApiKey,
-    carrier_api_pass: h.carrierApiPass ?? '',
+    ...(h.carrierApiPass ? { carrier_api_pass: h.carrierApiPass } : {}),
     carrier: h.carrier ?? null,
     sender_number: h.senderNumber ?? '',
     enable_call_ended: h.enableCallEnded,
